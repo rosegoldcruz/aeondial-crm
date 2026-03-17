@@ -78,3 +78,27 @@ apply_migration.sh
 
 # Google
 client_secret_for_google_auth.json
+
+# pnpm
+.pnpm-store/
+.pnpm/
+
+# Prisma
+prisma/generated/
+node_modules/.prisma/
+
+# Lighthouse / audit output
+lighthouse-results/
+*.report.html
+*.report.json
+lhci_results/
+
+# OS
+Thumbs.db
+*.swp
+*.swo
+
+# Misc
+.cache/
+tmp/
+temp/
