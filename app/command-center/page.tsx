@@ -279,6 +279,18 @@ export default function CommandCenterPage() {
     });
   };
 
+  const endCall = async () => {
+    if (!activeCallId) return;
+    await callApi('/telephony/calls/end', {
+      org_id: ORG_ID,
+      agent_id: agentId,
+      campaign_id: campaignId,
+      contact_id: contactId,
+      call_id: activeCallId,
+    });
+    setActiveCallId('');
+  };
+
   const sendWhisper = async () => {
     if (!whisperText) return;
 
@@ -376,6 +388,7 @@ export default function CommandCenterPage() {
               <Button onClick={transferCall} variant="secondary">Transfer</Button>
               <Input value={disposition} onChange={(e) => setDisposition(e.target.value)} placeholder="disposition" className="w-48 bg-black border-neutral-700 text-white" />
               <Button onClick={dispositionCall} variant="secondary">Disposition</Button>
+              <Button onClick={endCall} disabled={!activeCallId} className="bg-red-600 hover:bg-red-700 text-white">End Call</Button>
             </div>
 
             <div className="border border-neutral-800 rounded-md overflow-hidden">
@@ -390,7 +403,27 @@ export default function CommandCenterPage() {
                       <div className="text-white font-mono">{call.call_id}</div>
                       <div className="text-gray-400">{call.campaign_id} · {call.contact_id}</div>
                     </div>
-                    <Badge className="bg-neutral-800 text-neutral-200">{call.status}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-neutral-800 text-neutral-200">{call.status}</Badge>
+                      {!['ended', 'completed', 'transferred', 'failed'].includes(call.status) && (
+                        <Button
+                          size="sm"
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                          onClick={async () => {
+                            await callApi('/telephony/calls/end', {
+                              org_id: ORG_ID,
+                              agent_id: agentId,
+                              campaign_id: call.campaign_id || campaignId,
+                              contact_id: call.contact_id || contactId,
+                              call_id: call.call_id,
+                            });
+                            setActiveCallId('');
+                          }}
+                        >
+                          End
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

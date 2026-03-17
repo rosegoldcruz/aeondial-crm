@@ -49,6 +49,19 @@ export default function AgentWorkspacePage() {
     setCalls(refreshed);
   }
 
+  async function endCall(call: CallRecord) {
+    await apiPost<{ success: boolean; call?: CallRecord }>("/telephony/calls/end", {
+      org_id: ORG_ID,
+      agent_id: USER_ID,
+      campaign_id: call.campaign_id,
+      contact_id: call.contact_id,
+      call_id: call.call_id,
+    });
+    setCalls((prev) =>
+      prev.map((c) => (c.call_id === call.call_id ? { ...c, status: "ended" } : c))
+    );
+  }
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -65,7 +78,14 @@ export default function AgentWorkspacePage() {
                 <div className="font-medium">{call.call_id}</div>
                 <div className="text-neutral-500">Campaign: {call.campaign_id}</div>
               </div>
-              <Badge>{call.status}</Badge>
+              <div className="flex items-center gap-2">
+                <Badge>{call.status}</Badge>
+                {!["ended", "completed", "transferred", "failed"].includes(call.status) && (
+                  <Button size="sm" variant="destructive" onClick={() => endCall(call)}>
+                    End
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
           {myCalls.length === 0 ? <div className="text-sm text-neutral-500">No calls assigned to this agent yet.</div> : null}
