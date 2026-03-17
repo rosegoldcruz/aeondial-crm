@@ -55,37 +55,43 @@ export default function HomePage() {
     const gridSize = 64
     const dotCount = 46
     const snapToGrid = (value: number) => Math.round(value / gridSize) * gridSize
+    const seeded = (seed: number) => {
+      const x = Math.sin(seed * 12.9898) * 43758.5453
+      return x - Math.floor(x)
+    }
 
     const gridDots: GridDot[] = []
     const bursts: GridBurst[] = []
 
     const spawnBurst = (x: number, y: number) => {
+      const burstSeed = x * 0.073 + y * 0.041 + bursts.length * 0.19
       bursts.push({
         x,
         y,
         life: 0,
-        maxLife: 18 + Math.floor(Math.random() * 10),
-        size: 10 + Math.random() * 14,
+        maxLife: 18 + Math.floor(seeded(burstSeed) * 10),
+        size: 10 + seeded(burstSeed + 1.3) * 14,
       })
       if (bursts.length > 42) bursts.shift()
     }
 
     for (let i = 0; i < dotCount; i++) {
-      const isHorizontal = Math.random() > 0.5
-      const x = snapToGrid(Math.random() * canvas.offsetWidth)
-      const y = snapToGrid(Math.random() * canvas.offsetHeight)
+      const base = i + 1
+      const isHorizontal = base % 2 === 0
+      const x = snapToGrid(seeded(base * 1.17) * canvas.offsetWidth)
+      const y = snapToGrid(seeded(base * 2.31) * canvas.offsetHeight)
 
       gridDots.push({
         x,
         y,
         direction: isHorizontal ? "horizontal" : "vertical",
-        speed: Math.random() * 9 + 7.5,
-        size: Math.random() * 2.2 + 2.3,
-        opacity: Math.random() * 0.45 + 0.45,
-        color: colors[Math.floor(Math.random() * colors.length)],
+        speed: seeded(base * 0.97) * 9 + 7.5,
+        size: seeded(base * 1.83) * 2.2 + 2.3,
+        opacity: seeded(base * 2.57) * 0.45 + 0.45,
+        color: colors[Math.floor(seeded(base * 3.13) * colors.length)],
         targetX: x,
         targetY: y,
-        phase: Math.random() * Math.PI * 2,
+        phase: seeded(base * 4.21) * Math.PI * 2,
         trail: [],
       })
     }
@@ -104,20 +110,23 @@ export default function HomePage() {
       ctx.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight)
 
       for (const dot of gridDots) {
+        const movement = currentTime * 0.001 + dot.phase
         dot.trail.unshift({ x: dot.x, y: dot.y })
         if (dot.trail.length > 16) dot.trail.pop()
 
         if (dot.direction === "horizontal") {
           if (Math.abs(dot.x - dot.targetX) < dot.speed) {
             dot.x = dot.targetX
-            if (Math.random() > 0.35) {
+            if (Math.sin(movement * 1.9) > -0.25) {
               dot.direction = "vertical"
-              const steps = Math.floor(Math.random() * 6) + 1
-              dot.targetY = dot.y + (Math.random() > 0.5 ? 1 : -1) * steps * gridSize
-              if (Math.random() > 0.45) spawnBurst(dot.x, dot.y)
+              const steps = Math.floor(((Math.sin(movement * 2.7) + 1) / 2) * 6) + 1
+              const sign = Math.cos(movement * 3.2) > 0 ? 1 : -1
+              dot.targetY = dot.y + sign * steps * gridSize
+              if (Math.sin(movement * 4.3) > 0.1) spawnBurst(dot.x, dot.y)
             } else {
-              const steps = Math.floor(Math.random() * 7) + 2
-              dot.targetX = dot.x + (Math.random() > 0.5 ? 1 : -1) * steps * gridSize
+              const steps = Math.floor(((Math.cos(movement * 2.1) + 1) / 2) * 7) + 2
+              const sign = Math.sin(movement * 2.9) > 0 ? 1 : -1
+              dot.targetX = dot.x + sign * steps * gridSize
             }
           } else {
             dot.x += dot.x < dot.targetX ? dot.speed : -dot.speed
@@ -125,14 +134,16 @@ export default function HomePage() {
         } else {
           if (Math.abs(dot.y - dot.targetY) < dot.speed) {
             dot.y = dot.targetY
-            if (Math.random() > 0.35) {
+            if (Math.cos(movement * 1.8) > -0.25) {
               dot.direction = "horizontal"
-              const steps = Math.floor(Math.random() * 7) + 2
-              dot.targetX = dot.x + (Math.random() > 0.5 ? 1 : -1) * steps * gridSize
-              if (Math.random() > 0.45) spawnBurst(dot.x, dot.y)
+              const steps = Math.floor(((Math.sin(movement * 2.4) + 1) / 2) * 7) + 2
+              const sign = Math.cos(movement * 2.8) > 0 ? 1 : -1
+              dot.targetX = dot.x + sign * steps * gridSize
+              if (Math.sin(movement * 4.1) > 0.1) spawnBurst(dot.x, dot.y)
             } else {
-              const steps = Math.floor(Math.random() * 6) + 1
-              dot.targetY = dot.y + (Math.random() > 0.5 ? 1 : -1) * steps * gridSize
+              const steps = Math.floor(((Math.cos(movement * 2.2) + 1) / 2) * 6) + 1
+              const sign = Math.sin(movement * 3.1) > 0 ? 1 : -1
+              dot.targetY = dot.y + sign * steps * gridSize
             }
           } else {
             dot.y += dot.y < dot.targetY ? dot.speed : -dot.speed

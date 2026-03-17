@@ -447,7 +447,7 @@ export default function BusinessSettingsPage() {
                 <div className="flex items-center gap-1 h-16">
                   {/* Waveform bars */}
                   {Array.from({ length: 60 }).map((_, i) => {
-                    const height = Math.random() * 100
+                    const height = ((Math.sin(i * 0.45) + 1) / 2) * 90 + 5
                     const isActive = i < 30 // First half is "played"
                     return (
                       <div
