@@ -156,6 +156,7 @@ export default function DialerAgentPanel() {
 
   const wsRef = useRef<WebSocket | null>(null);
   const softphone = useSoftphone(softphoneConfig);
+  const agentId = softphoneConfig?.agent_id || USER_ID;
 
   const callTimer = useCallTimer(
     session?.state === "INCALL",
@@ -205,13 +206,13 @@ export default function DialerAgentPanel() {
   // ── Restore session on mount ────────────────────────────────────────────────
 
   useEffect(() => {
-    apiGet<{ session: AgentSession }>(`/dialer/agents/${USER_ID}/session`)
+    apiGet<{ session: AgentSession }>(`/dialer/agents/${agentId}/session`)
       .then(({ session }) => {
         setSession(session);
         if (session.campaign_id) setSelectedCampaign(session.campaign_id);
       })
       .catch(() => {/* no existing session */});
-  }, []);
+  }, [agentId]);
 
   // ── WebSocket subscription ──────────────────────────────────────────────────
 
@@ -229,7 +230,7 @@ export default function DialerAgentPanel() {
 
       if (evt.type === "agent.state") {
         const payload = evt.payload ?? {};
-        if (payload.agent_id === USER_ID) {
+        if (payload.agent_id === agentId) {
           setSession((prev) =>
             prev
               ? { ...prev, state: payload.to_state as AgentState, last_state_at: new Date().toISOString() }
@@ -255,7 +256,7 @@ export default function DialerAgentPanel() {
 
       if (evt.type === "call.human_ready") {
         const payload = evt.payload ?? {};
-        if (payload.agent_id === USER_ID) {
+        if (payload.agent_id === agentId) {
           setHumanReady({
             call_id: String(payload.call_id ?? ""),
             agent_id: typeof payload.agent_id === "string" ? payload.agent_id : undefined,
@@ -277,7 +278,7 @@ export default function DialerAgentPanel() {
 
       if (evt.type === "call.bridged") {
         const payload = evt.payload ?? {};
-        if (payload.agent_id === USER_ID) {
+        if (payload.agent_id === agentId) {
           setHumanReady(null);
           setWrapUntil(null);
           setStatusMsg("Live call connected");
@@ -290,7 +291,7 @@ export default function DialerAgentPanel() {
             campaign_id: session?.campaign_id ?? null,
             contact_id: typeof livePayload.contact_id === "string" ? livePayload.contact_id : null,
             lead_id: typeof livePayload.lead_id === "string" ? livePayload.lead_id : null,
-            assigned_agent: USER_ID,
+            assigned_agent: agentId,
             status: typeof livePayload.status === "string" ? livePayload.status : "BRIDGED",
             started_at: typeof livePayload.started_at === "string" ? livePayload.started_at : new Date().toISOString(),
             metadata,
@@ -304,7 +305,7 @@ export default function DialerAgentPanel() {
 
       if (evt.type === "call.wrap") {
         const payload = evt.payload ?? {};
-        if (payload.agent_id === USER_ID) {
+        if (payload.agent_id === agentId) {
           if (typeof payload.wrap_until === "string") {
             setWrapUntil(payload.wrap_until);
           }
@@ -324,7 +325,7 @@ export default function DialerAgentPanel() {
 
     wsRef.current = ws;
     return ws;
-  }, [callInfo?.call_id]);
+  }, [agentId, callInfo?.call_id, session?.campaign_id]);
 
   useEffect(() => {
     const ws = connectWs();
@@ -351,7 +352,7 @@ export default function DialerAgentPanel() {
     setError(null);
     try {
       const res = await apiPost<{ session: AgentSession }>("/dialer/agents/session", {
-        agent_id: USER_ID,
+        agent_id: agentId,
         campaign_id: selectedCampaign,
         endpoint: softphoneConfig.endpoint,
         softphone: softphoneConfig,
@@ -383,7 +384,7 @@ export default function DialerAgentPanel() {
     try {
       await apiPost("/telephony/calls/end", {
         org_id: ORG_ID,
-        agent_id: USER_ID,
+        agent_id: agentId,
         call_id: callInfo.call_id,
       });
       // INCALL → WRAP will come via WebSocket

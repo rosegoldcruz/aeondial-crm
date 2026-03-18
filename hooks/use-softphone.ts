@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Invitation, Registerer, SessionState, UserAgent, type RegistererState } from "sip.js";
 
 export interface SoftphoneConfig {
+  agent_id?: string;
   endpoint: string | null;
   sip_uri: string | null;
   authorization_username: string | null;
