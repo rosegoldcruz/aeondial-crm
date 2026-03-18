@@ -331,7 +331,17 @@ export default function DialerAgentPanel() {
   async function goReady() {
     if (!selectedCampaign) { setError("Select a campaign first"); return; }
     if (!softphoneConfig?.endpoint) { setError("Softphone endpoint is not configured"); return; }
-    if (!softphone.isRegistered) { setError("Softphone must be registered before going READY"); return; }
+    const browserSoftphoneConfigured = Boolean(
+      softphoneConfig?.sip_uri &&
+      softphoneConfig?.authorization_username &&
+      softphoneConfig?.password &&
+      softphoneConfig?.ws_server,
+    );
+    const externalPhoneMode = Boolean(softphoneConfig?.endpoint) && !browserSoftphoneConfigured;
+    if (!externalPhoneMode && !softphone.isRegistered) {
+      setError("Softphone must be registered before going READY");
+      return;
+    }
     setError(null);
     try {
       const res = await apiPost<{ session: AgentSession }>("/dialer/agents/session", {
@@ -412,8 +422,17 @@ export default function DialerAgentPanel() {
   const isInCall = agentState === "INCALL";
   const isWrap = agentState === "WRAP";
   const isPaused = agentState === "PAUSED";
+  const browserSoftphoneConfigured = Boolean(
+    softphoneConfig?.sip_uri &&
+    softphoneConfig?.authorization_username &&
+    softphoneConfig?.password &&
+    softphoneConfig?.ws_server,
+  );
+  const externalPhoneMode = Boolean(softphoneConfig?.endpoint) && !browserSoftphoneConfigured;
   const softphoneStatusLabel =
-    softphone.status === "registered"
+    externalPhoneMode
+      ? "External SIP Phone"
+      : softphone.status === "registered"
       ? "Registered"
       : softphone.status === "connecting"
         ? "Registering..."
@@ -472,11 +491,11 @@ export default function DialerAgentPanel() {
               ) : (
                 <div className="text-xs text-red-400">No endpoint configured in agent softphone metadata</div>
               )}
-              {softphone.error ? (
+              {!externalPhoneMode && softphone.error ? (
                 <div className="text-xs text-red-400 mt-1">{softphone.error}</div>
               ) : null}
             </div>
-            <Badge className={softphone.isRegistered ? "bg-green-600 text-white" : "bg-gray-700 text-white"}>
+            <Badge className={(externalPhoneMode || softphone.isRegistered) ? "bg-green-600 text-white" : "bg-gray-700 text-white"}>
               {softphoneStatusLabel}
             </Badge>
           </CardContent>
@@ -504,11 +523,11 @@ export default function DialerAgentPanel() {
 
               <Button
                 onClick={goReady}
-                disabled={!selectedCampaign || !softphone.isRegistered}
+                disabled={!selectedCampaign || (!externalPhoneMode && !softphone.isRegistered)}
                 className="w-full bg-green-600 hover:bg-green-500 text-white font-semibold"
               >
                 <Phone className="h-4 w-4 mr-2" />
-                {softphone.isRegistered ? "Go Ready" : "Waiting For Softphone"}
+                {(externalPhoneMode || softphone.isRegistered) ? "Go Ready" : "Waiting For Softphone"}
               </Button>
             </CardContent>
           </Card>
