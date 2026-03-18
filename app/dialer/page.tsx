@@ -36,6 +36,7 @@ import {
   RadioTower,
 } from "lucide-react";
 import { apiPost, apiGet, getApiHeaders, BACKEND_URL, ORG_ID, USER_ID, toWebSocketUrl } from "@/lib/backend";
+import { useSoftphone, type SoftphoneConfig } from "@/hooks/use-softphone";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,18 @@ interface Campaign {
   campaign_id: string;
   name: string;
   status: string;
+}
+
+interface HumanReadyPayload {
+  call_id: string;
+  agent_id?: string;
+  session_id?: string;
+  stage?: string;
+  lead_name?: string | null;
+  contact_name?: string | null;
+  lead_phone?: string | null;
+  phone?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 type DispositionOutcome =
@@ -137,20 +150,50 @@ export default function DialerAgentPanel() {
   const [dispCallbackDate, setDispCallbackDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [softphoneConfig, setSoftphoneConfig] = useState<SoftphoneConfig | null>(null);
+  const [wrapUntil, setWrapUntil] = useState<string | null>(null);
+  const [humanReady, setHumanReady] = useState<HumanReadyPayload | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const softphone = useSoftphone(softphoneConfig);
 
   const callTimer = useCallTimer(
     session?.state === "INCALL",
     callInfo?.started_at ?? null,
   );
 
+  const [wrapCountdown, setWrapCountdown] = useState(0);
+
+  useEffect(() => {
+    if (!wrapUntil) {
+      setWrapCountdown(0);
+      return;
+    }
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((Date.parse(wrapUntil) - Date.now()) / 1000));
+      setWrapCountdown(remaining);
+    };
+
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [wrapUntil]);
+
   // ── Load campaigns ──────────────────────────────────────────────────────────
 
   useEffect(() => {
-    apiGet<Campaign[]>("/campaigns")
+    apiGet<Campaign[]>(`/campaigns?org_id=${encodeURIComponent(ORG_ID)}`)
       .then(setCampaigns)
       .catch(() => {/* non-fatal */});
+  }, []);
+
+  useEffect(() => {
+    apiGet<SoftphoneConfig>("/dialer/agents/self/softphone")
+      .then(setSoftphoneConfig)
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load softphone config");
+      });
   }, []);
 
   // ── Restore session on mount ────────────────────────────────────────────────
@@ -190,25 +233,85 @@ export default function DialerAgentPanel() {
           // Show disposition modal on WRAP
           if (payload.to_state === "WRAP") {
             setShowDispModal(true);
+            setStatusMsg("Call ended — wrap up and disposition");
           }
+
+          if (payload.to_state === "READY") {
+            setWrapUntil(null);
+            setHumanReady(null);
+            if (callInfo) {
+              setCallInfo(null);
+            }
+            setShowDispModal(false);
+          }
+        }
+      }
+
+      if (evt.type === "call.human_ready") {
+        const payload = evt.payload ?? {};
+        if (payload.agent_id === USER_ID) {
+          setHumanReady({
+            call_id: String(payload.call_id ?? ""),
+            agent_id: typeof payload.agent_id === "string" ? payload.agent_id : undefined,
+            session_id: typeof payload.session_id === "string" ? payload.session_id : undefined,
+            stage: typeof payload.stage === "string" ? payload.stage : undefined,
+            lead_name: typeof payload.lead_name === "string" ? payload.lead_name : null,
+            contact_name: typeof payload.contact_name === "string" ? payload.contact_name : null,
+            lead_phone: typeof payload.lead_phone === "string" ? payload.lead_phone : null,
+            phone: typeof payload.phone === "string" ? payload.phone : null,
+            metadata: (payload.metadata || {}) as Record<string, unknown>,
+          });
+          setStatusMsg(
+            payload.stage === "beeping"
+              ? "Human detected — beeping agent"
+              : "Human detected — alerting agent",
+          );
         }
       }
 
       if (evt.type === "call.bridged") {
         const payload = evt.payload ?? {};
         if (payload.agent_id === USER_ID) {
-          // Fetch call info
+          setHumanReady(null);
+          setWrapUntil(null);
+          setStatusMsg("Live call connected");
+
+          const livePayload = payload as Record<string, unknown>;
+          const metadata = (livePayload.metadata || {}) as Record<string, unknown>;
+          setCallInfo({
+            call_id: String(payload.call_id),
+            org_id: ORG_ID,
+            campaign_id: session?.campaign_id ?? null,
+            contact_id: typeof livePayload.contact_id === "string" ? livePayload.contact_id : null,
+            lead_id: typeof livePayload.lead_id === "string" ? livePayload.lead_id : null,
+            assigned_agent: USER_ID,
+            status: typeof livePayload.status === "string" ? livePayload.status : "BRIDGED",
+            started_at: typeof livePayload.started_at === "string" ? livePayload.started_at : new Date().toISOString(),
+            metadata,
+          });
+
           apiGet<LiveCall>(`/telephony/calls/${payload.call_id}`)
             .then(setCallInfo)
-            .catch(() => {/* ignore */});
+            .catch(() => {/* fallback payload already applied */});
+        }
+      }
+
+      if (evt.type === "call.wrap") {
+        const payload = evt.payload ?? {};
+        if (payload.agent_id === USER_ID) {
+          if (typeof payload.wrap_until === "string") {
+            setWrapUntil(payload.wrap_until);
+          }
+          setShowDispModal(true);
+          setStatusMsg("Wrap time started");
         }
       }
 
       if (evt.type === "call.event") {
         const payload = evt.payload ?? {};
         const action = payload.action as string | undefined;
-        if (action === "ended" && callInfo?.call_id === (payload.call_id as string)) {
-          setCallInfo(null);
+        if ((action === "call.ended" || action === "ended") && callInfo?.call_id === (payload.call_id as string)) {
+          setStatusMsg("Call ended — wrap time");
         }
       }
     };
@@ -227,11 +330,15 @@ export default function DialerAgentPanel() {
 
   async function goReady() {
     if (!selectedCampaign) { setError("Select a campaign first"); return; }
+    if (!softphoneConfig?.endpoint) { setError("Softphone endpoint is not configured"); return; }
+    if (!softphone.isRegistered) { setError("Softphone must be registered before going READY"); return; }
     setError(null);
     try {
       const res = await apiPost<{ session: AgentSession }>("/dialer/agents/session", {
         agent_id: USER_ID,
         campaign_id: selectedCampaign,
+        endpoint: softphoneConfig.endpoint,
+        softphone: softphoneConfig,
       });
       setSession(res.session);
       setStatusMsg("You are now READY to receive calls");
@@ -283,6 +390,8 @@ export default function DialerAgentPanel() {
       setDispNotes("");
       setDispCallbackDate("");
       setCallInfo(null);
+      setWrapUntil(null);
+      setHumanReady(null);
       setStatusMsg("Disposition saved — returning to READY");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Disposition failed");
@@ -303,10 +412,28 @@ export default function DialerAgentPanel() {
   const isInCall = agentState === "INCALL";
   const isWrap = agentState === "WRAP";
   const isPaused = agentState === "PAUSED";
+  const softphoneStatusLabel =
+    softphone.status === "registered"
+      ? "Registered"
+      : softphone.status === "connecting"
+        ? "Registering..."
+        : softphone.status === "error"
+          ? "Softphone Error"
+          : "Softphone Idle";
+  const autoNextEnabled = Boolean(session) && ["READY", "RESERVED", "WRAP"].includes(agentState);
 
   const lead = callInfo?.metadata as Record<string, unknown> | null;
-  const leadName = lead?.lead_name ?? lead?.contact_name ?? "Unknown Lead";
-  const leadPhone = lead?.phone ?? callInfo?.metadata?.endpoint ?? "—";
+  const leadName =
+    humanReady?.lead_name ??
+    humanReady?.contact_name ??
+    lead?.lead_name ??
+    lead?.contact_name ??
+    "Unknown Lead";
+  const leadPhone =
+    humanReady?.lead_phone ??
+    humanReady?.phone ??
+    lead?.phone ??
+    (typeof callInfo?.metadata?.endpoint === "string" ? callInfo.metadata.endpoint : "—");
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 flex flex-col items-center">
@@ -335,6 +462,26 @@ export default function DialerAgentPanel() {
           </div>
         )}
 
+        <Card className="bg-gray-900 border-gray-700">
+          <CardContent className="pt-4 pb-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm text-gray-400">Browser softphone</div>
+              <div className="text-sm text-white font-medium">{softphoneStatusLabel}</div>
+              {softphoneConfig?.endpoint ? (
+                <div className="text-xs text-gray-500 font-mono">{softphoneConfig.endpoint}</div>
+              ) : (
+                <div className="text-xs text-red-400">No endpoint configured in agent softphone metadata</div>
+              )}
+              {softphone.error ? (
+                <div className="text-xs text-red-400 mt-1">{softphone.error}</div>
+              ) : null}
+            </div>
+            <Badge className={softphone.isRegistered ? "bg-green-600 text-white" : "bg-gray-700 text-white"}>
+              {softphoneStatusLabel}
+            </Badge>
+          </CardContent>
+        </Card>
+
         {/* ── Campaign selector (only when offline) ── */}
         {isOffline && (
           <Card className="bg-gray-900 border-gray-700">
@@ -357,11 +504,11 @@ export default function DialerAgentPanel() {
 
               <Button
                 onClick={goReady}
-                disabled={!selectedCampaign}
+                disabled={!selectedCampaign || !softphone.isRegistered}
                 className="w-full bg-green-600 hover:bg-green-500 text-white font-semibold"
               >
                 <Phone className="h-4 w-4 mr-2" />
-                Go Ready
+                {softphone.isRegistered ? "Go Ready" : "Waiting For Softphone"}
               </Button>
             </CardContent>
           </Card>
@@ -392,6 +539,16 @@ export default function DialerAgentPanel() {
                   </span>
                 </p>
               )}
+
+              {humanReady ? (
+                <div className="rounded-lg border border-yellow-700 bg-yellow-900/30 px-4 py-3 text-sm text-yellow-200">
+                  {humanReady.stage === "beeping" ? "Human detected. Playing agent beep..." : "Human detected. Alerting agent..."}
+                </div>
+              ) : null}
+
+              <p className="text-xs text-gray-500">
+                Auto-next: <span className="text-white">{autoNextEnabled ? "Armed" : "Idle"}</span>
+              </p>
 
               <div className="flex gap-2 justify-center">
                 {isReady && (
@@ -488,6 +645,9 @@ export default function DialerAgentPanel() {
                 <Clock className="h-6 w-6" />
                 <span className="text-base font-medium">Wrap — submit disposition</span>
               </div>
+              {wrapCountdown > 0 ? (
+                <div className="text-sm text-orange-200">Auto-ready in {wrapCountdown}s</div>
+              ) : null}
               <Button
                 onClick={() => setShowDispModal(true)}
                 className="bg-orange-600 hover:bg-orange-500 text-white"
@@ -530,6 +690,7 @@ export default function DialerAgentPanel() {
       </div>
 
       {/* ── Disposition Modal ─────────────────────────────────────────────── */}
+      <audio ref={softphone.audioRef} autoPlay playsInline />
       <Dialog open={showDispModal} onOpenChange={setShowDispModal}>
         <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md">
           <DialogHeader>
