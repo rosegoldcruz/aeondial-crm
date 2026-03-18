@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react"
 import {
   LogIn,
   Phone,
+  PhoneCall,
   Users,
   BarChart3,
   Settings,
@@ -50,6 +51,7 @@ const navigation = [
     icon: Users,
     submenu: [
       { name: "All Agents", href: "/agents" },
+      { name: "Live Dialer", href: "/dialer" },
       { name: "Agent Workspace", href: "/agents/workspace" },
       { name: "Agent Status", href: "/agents/status" },
       { name: "Performance", href: "/agents/performance" },
@@ -103,6 +105,7 @@ const navigation = [
     ],
   },
   { name: "Outbound", href: "/outbound", icon: Phone },
+  { name: "Dialer", href: "/dialer", icon: PhoneCall },
   { name: "Compliance", href: "/compliance", icon: Shield },
   {
     name: "Automation",
