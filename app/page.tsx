@@ -337,7 +337,7 @@ export default function HomePage() {
             path="/"
             routing="path"
             signUpUrl="/register"
-            fallbackRedirectUrl="/dashboard"
+            fallbackRedirectUrl="/dialer"
           />
         </motion.div>
       </div>

@@ -51,7 +51,10 @@ export default function RootLayout({
         <meta name="theme-color" content="#18181B" />
       </head>
       <body className={`${inter.className} bg-neutral-950 text-white antialiased`}>
-        <ClerkProvider>
+        <ClerkProvider
+          signInFallbackRedirectUrl="/dialer"
+          signUpFallbackRedirectUrl="/dialer"
+        >
           <header className="fixed right-2 top-2 sm:right-4 sm:top-4 z-50">
             <SignedOut>
               <div className="flex items-center gap-2">

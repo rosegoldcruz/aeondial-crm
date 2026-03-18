@@ -8,7 +8,7 @@ export default function RegisterPage() {
           path="/register"
           routing="path"
           signInUrl="/"
-          fallbackRedirectUrl="/dashboard"
+          fallbackRedirectUrl="/dialer"
         />
       </div>
     </main>
