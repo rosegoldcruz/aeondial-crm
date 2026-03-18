@@ -1,0 +1,43 @@
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
+const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || process.env.ORG_ID || "default-tenant";
+const USER_ROLE = process.env.NEXT_PUBLIC_USER_ROLE || "admin";
+
+export async function GET() {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const clerkUser = await currentUser();
+  const email = clerkUser?.emailAddresses?.[0]?.emailAddress || null;
+  const fullName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ") || null;
+
+  const res = await fetch(`${BACKEND_URL}/dialer/agents/self/softphone`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "x-org-id": ORG_ID,
+      "x-role": USER_ROLE,
+      "x-user-id": userId,
+      "x-user-email": email || `${userId}@clerk.local`,
+      "x-user-name": fullName || "Daniel Cruz",
+      "x-softphone-endpoint": "4699",
+      "x-softphone-transport": "udp",
+      "x-softphone-host": "137.184.126.46",
+    },
+    cache: "no-store",
+  });
+
+  const text = await res.text();
+  let body: unknown = {};
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    body = { error: text || "Invalid backend response" };
+  }
+
+  return NextResponse.json(body, { status: res.status });
+}

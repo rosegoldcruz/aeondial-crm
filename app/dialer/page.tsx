@@ -35,7 +35,7 @@ import {
   CheckCircle2,
   RadioTower,
 } from "lucide-react";
-import { apiPost, apiGet, getApiHeaders, BACKEND_URL, ORG_ID, USER_ID, toWebSocketUrl } from "@/lib/backend";
+import { apiPost, apiGet, BACKEND_URL, ORG_ID, USER_ID, toWebSocketUrl } from "@/lib/backend";
 import { useSoftphone, type SoftphoneConfig } from "@/hooks/use-softphone";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -189,8 +189,14 @@ export default function DialerAgentPanel() {
   }, []);
 
   useEffect(() => {
-    apiGet<SoftphoneConfig>("/dialer/agents/self/softphone")
-      .then(setSoftphoneConfig)
+    fetch("/api/dialer/agents/self/softphone", { cache: "no-store" })
+      .then(async (res) => {
+        const body = (await res.json()) as SoftphoneConfig | { error?: string };
+        if (!res.ok) {
+          throw new Error((body as { error?: string }).error || "Failed to load softphone config");
+        }
+        setSoftphoneConfig(body as SoftphoneConfig);
+      })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to load softphone config");
       });
