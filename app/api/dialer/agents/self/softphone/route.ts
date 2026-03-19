@@ -1,9 +1,17 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || process.env.ORG_ID || "default-tenant";
-const USER_ROLE = process.env.NEXT_PUBLIC_USER_ROLE || "admin";
+function sanitizeEnv(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return value.replace(/^['"]|['"]$/g, "");
+}
+
+const BACKEND_URL =
+  sanitizeEnv(process.env.NEXT_PUBLIC_AEONDIAL_BACKEND_URL) ||
+  sanitizeEnv(process.env.NEXT_PUBLIC_BACKEND_URL) ||
+  "http://localhost:4000";
+const ORG_ID = sanitizeEnv(process.env.NEXT_PUBLIC_ORG_ID) || sanitizeEnv(process.env.ORG_ID) || "default-tenant";
+const USER_ROLE = sanitizeEnv(process.env.NEXT_PUBLIC_USER_ROLE) || "admin";
 
 export async function GET() {
   const { userId } = await auth();

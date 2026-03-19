@@ -1,9 +1,16 @@
-export const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+function sanitizeEnv(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return value.replace(/^['"]|['"]$/g, "");
+}
 
-export const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || 'default-tenant';
-export const USER_ID = process.env.NEXT_PUBLIC_USER_ID || 'crm-user';
-export const USER_ROLE = process.env.NEXT_PUBLIC_USER_ROLE || 'admin';
+export const BACKEND_URL =
+  sanitizeEnv(process.env.NEXT_PUBLIC_AEONDIAL_BACKEND_URL) ||
+  sanitizeEnv(process.env.NEXT_PUBLIC_BACKEND_URL) ||
+  'http://localhost:4000';
+
+export const ORG_ID = sanitizeEnv(process.env.NEXT_PUBLIC_ORG_ID) || 'default-tenant';
+export const USER_ID = sanitizeEnv(process.env.NEXT_PUBLIC_USER_ID) || 'crm-user';
+export const USER_ROLE = sanitizeEnv(process.env.NEXT_PUBLIC_USER_ROLE) || 'admin';
 
 export function getApiHeaders(orgId = ORG_ID): HeadersInit {
   return {
