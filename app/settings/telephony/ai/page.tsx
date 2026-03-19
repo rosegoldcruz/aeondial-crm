@@ -37,8 +37,15 @@ interface FormState {
   stt_provider: SttProvider;
 }
 
+function sanitizeEnv(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return value.replace(/^['"]|['"]$/g, '');
+}
+
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+  sanitizeEnv(process.env.NEXT_PUBLIC_AEONDIAL_BACKEND_URL) ||
+  sanitizeEnv(process.env.NEXT_PUBLIC_BACKEND_URL) ||
+  'http://localhost:4000';
 
 const ENV_DEFAULTS: TenantSettings = {
   llm_provider: 'openai',
