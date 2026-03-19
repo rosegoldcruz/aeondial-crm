@@ -48,6 +48,7 @@ interface AgentSession {
   campaign_id: string | null;
   state: AgentState;
   last_state_at: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface LiveCall {
@@ -66,6 +67,11 @@ interface Campaign {
   campaign_id: string;
   name: string;
   status: string;
+}
+
+interface WsEvent {
+  type: string;
+  payload?: Record<string, unknown>;
 }
 
 interface HumanReadyPayload {
@@ -114,6 +120,29 @@ function stateBadge(state: AgentState): string {
   }
 }
 
+function normalizeCampaigns(payload: Campaign[]): Campaign[] {
+  return [...payload]
+    .filter((campaign) => Boolean(campaign.campaign_id))
+    .sort((a, b) => (b.status === "active" ? 1 : 0) - (a.status === "active" ? 1 : 0) || a.name.localeCompare(b.name));
+}
+
+function findLiveCallForAgent(
+  calls: LiveCall[],
+  agentId: string,
+  sessionId?: string | null,
+): LiveCall | null {
+  const match = calls.find((call) => {
+    const metadata = (call.metadata || {}) as Record<string, unknown>;
+    return (
+      call.assigned_agent === agentId ||
+      metadata.agent_id === agentId ||
+      (sessionId ? metadata.session_id === sessionId : false)
+    );
+  });
+
+  return match ?? null;
+}
+
 // ── Call timer hook ────────────────────────────────────────────────────────────
 
 function useCallTimer(active: boolean, startedAt: string | null): string {
@@ -155,8 +184,32 @@ export default function DialerAgentPanel() {
   const [humanReady, setHumanReady] = useState<HumanReadyPayload | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const sessionDebugRef = useRef<string | null>(null);
+  const campaignsDebugRef = useRef<string | null>(null);
+  const uiStateDebugRef = useRef<string | null>(null);
   const softphone = useSoftphone(softphoneConfig);
   const agentId = softphoneConfig?.agent_id || USER_ID;
+
+  const logSessionPayload = useCallback((nextSession: AgentSession | null) => {
+    const serialized = JSON.stringify(nextSession);
+    if (sessionDebugRef.current === serialized) return;
+    sessionDebugRef.current = serialized;
+    console.debug("[dialer] session payload received", nextSession);
+  }, []);
+
+  const logCampaignsPayload = useCallback((nextCampaigns: Campaign[]) => {
+    const serialized = JSON.stringify(nextCampaigns);
+    if (campaignsDebugRef.current === serialized) return;
+    campaignsDebugRef.current = serialized;
+    console.debug("[dialer] campaigns payload received", nextCampaigns);
+  }, []);
+
+  const logUiState = useCallback((nextState: Record<string, unknown>) => {
+    const serialized = JSON.stringify(nextState);
+    if (uiStateDebugRef.current === serialized) return;
+    uiStateDebugRef.current = serialized;
+    console.debug("[dialer] normalized UI state derived from backend", nextState);
+  }, []);
 
   const callTimer = useCallTimer(
     session?.state === "INCALL",
@@ -183,11 +236,32 @@ export default function DialerAgentPanel() {
 
   // ── Load campaigns ──────────────────────────────────────────────────────────
 
+  const refreshCampaigns = useCallback(async () => {
+    try {
+      const payload = await apiGet<Campaign[]>(`/campaigns?org_id=${encodeURIComponent(ORG_ID)}`);
+      const normalized = normalizeCampaigns(payload);
+      setCampaigns(normalized);
+      logCampaignsPayload(normalized);
+      setSelectedCampaign((current) => {
+        if (current && normalized.some((campaign) => campaign.campaign_id === current)) {
+          return current;
+        }
+        if (session?.campaign_id && normalized.some((campaign) => campaign.campaign_id === session.campaign_id)) {
+          return session.campaign_id;
+        }
+        if (normalized.length === 1) {
+          return normalized[0].campaign_id;
+        }
+        return current;
+      });
+    } catch {
+      // non-fatal
+    }
+  }, [logCampaignsPayload, session?.campaign_id]);
+
   useEffect(() => {
-    apiGet<Campaign[]>(`/campaigns?org_id=${encodeURIComponent(ORG_ID)}`)
-      .then(setCampaigns)
-      .catch(() => {/* non-fatal */});
-  }, []);
+    void refreshCampaigns();
+  }, [refreshCampaigns]);
 
   useEffect(() => {
     fetch("/api/dialer/agents/self/softphone", { cache: "no-store" })
@@ -205,14 +279,37 @@ export default function DialerAgentPanel() {
 
   // ── Restore session on mount ────────────────────────────────────────────────
 
+  const refreshDialerState = useCallback(async () => {
+    try {
+      const [{ session: nextSession }, liveCalls] = await Promise.all([
+        apiGet<{ session: AgentSession }>(`/dialer/agents/${agentId}/session`),
+        apiGet<LiveCall[]>(`/dialer/calls/live?limit=100`),
+      ]);
+
+      setSession(nextSession);
+      logSessionPayload(nextSession);
+      if (nextSession.campaign_id) {
+        setSelectedCampaign(nextSession.campaign_id);
+      }
+
+      const nextCall = findLiveCallForAgent(liveCalls, agentId, nextSession.session_id);
+      setCallInfo(nextCall);
+      if (!nextCall && nextSession.state !== "INCALL") {
+        setHumanReady(null);
+      }
+    } catch {
+      setSession(null);
+      setCallInfo(null);
+    }
+  }, [agentId, logSessionPayload]);
+
   useEffect(() => {
-    apiGet<{ session: AgentSession }>(`/dialer/agents/${agentId}/session`)
-      .then(({ session }) => {
-        setSession(session);
-        if (session.campaign_id) setSelectedCampaign(session.campaign_id);
-      })
-      .catch(() => {/* no existing session */});
-  }, [agentId]);
+    void refreshDialerState();
+    const intervalId = window.setInterval(() => {
+      void refreshDialerState();
+    }, 5000);
+    return () => window.clearInterval(intervalId);
+  }, [refreshDialerState]);
 
   // ── WebSocket subscription ──────────────────────────────────────────────────
 
@@ -225,17 +322,13 @@ export default function DialerAgentPanel() {
     ws.onerror = () => ws.close();
 
     ws.onmessage = (ev) => {
-      let evt: { type: string; payload?: Record<string, unknown> };
+      let evt: WsEvent;
       try { evt = JSON.parse(ev.data as string); } catch { return; }
 
       if (evt.type === "agent.state") {
         const payload = evt.payload ?? {};
         if (payload.agent_id === agentId) {
-          setSession((prev) =>
-            prev
-              ? { ...prev, state: payload.to_state as AgentState, last_state_at: new Date().toISOString() }
-              : prev,
-          );
+          void refreshDialerState();
 
           // Show disposition modal on WRAP
           if (payload.to_state === "WRAP") {
@@ -246,9 +339,7 @@ export default function DialerAgentPanel() {
           if (payload.to_state === "READY") {
             setWrapUntil(null);
             setHumanReady(null);
-            if (callInfo) {
-              setCallInfo(null);
-            }
+            setCallInfo(null);
             setShowDispModal(false);
           }
         }
@@ -273,44 +364,26 @@ export default function DialerAgentPanel() {
               ? "Human detected — beeping agent"
               : "Human detected — alerting agent",
           );
+          void refreshDialerState();
         }
       }
 
       if (evt.type === "call.bridged") {
-        const payload = evt.payload ?? {};
-        if (payload.agent_id === agentId) {
-          setHumanReady(null);
-          setWrapUntil(null);
-          setStatusMsg("Live call connected");
-
-          const livePayload = payload as Record<string, unknown>;
-          const metadata = (livePayload.metadata || {}) as Record<string, unknown>;
-          setCallInfo({
-            call_id: String(payload.call_id),
-            org_id: ORG_ID,
-            campaign_id: session?.campaign_id ?? null,
-            contact_id: typeof livePayload.contact_id === "string" ? livePayload.contact_id : null,
-            lead_id: typeof livePayload.lead_id === "string" ? livePayload.lead_id : null,
-            assigned_agent: agentId,
-            status: typeof livePayload.status === "string" ? livePayload.status : "BRIDGED",
-            started_at: typeof livePayload.started_at === "string" ? livePayload.started_at : new Date().toISOString(),
-            metadata,
-          });
-
-          apiGet<LiveCall>(`/telephony/calls/${payload.call_id}`)
-            .then(setCallInfo)
-            .catch(() => {/* fallback payload already applied */});
-        }
+        setHumanReady(null);
+        setWrapUntil(null);
+        setStatusMsg("Live call connected");
+        void refreshDialerState();
       }
 
       if (evt.type === "call.wrap") {
         const payload = evt.payload ?? {};
-        if (payload.agent_id === agentId) {
+        if (payload.agent_id === agentId || session?.state === "INCALL") {
           if (typeof payload.wrap_until === "string") {
             setWrapUntil(payload.wrap_until);
           }
           setShowDispModal(true);
           setStatusMsg("Wrap time started");
+          void refreshDialerState();
         }
       }
 
@@ -319,19 +392,27 @@ export default function DialerAgentPanel() {
         const action = payload.action as string | undefined;
         if ((action === "call.ended" || action === "ended") && callInfo?.call_id === (payload.call_id as string)) {
           setStatusMsg("Call ended — wrap time");
+          void refreshDialerState();
         }
+      }
+
+      if (
+        evt.type === "call.amd_result" ||
+        evt.type === "queue.lead_dialing" ||
+        evt.type === "queue.lead_answered"
+      ) {
+        void refreshDialerState();
       }
     };
 
     wsRef.current = ws;
     return ws;
-  }, [agentId, callInfo?.call_id, session?.campaign_id]);
+  }, [agentId, callInfo?.call_id, refreshDialerState, session?.state]);
 
   useEffect(() => {
     const ws = connectWs();
     return () => ws.close();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [connectWs]);
 
   // ── Agent actions ───────────────────────────────────────────────────────────
 
@@ -447,6 +528,14 @@ export default function DialerAgentPanel() {
           ? "Softphone Error"
           : "Softphone Idle";
   const autoNextEnabled = Boolean(session) && ["READY", "RESERVED", "WRAP"].includes(agentState);
+  const hasSelectedCampaign = selectedCampaign.trim().length > 0;
+  const softphoneReadyForDialing = externalPhoneMode || softphone.isRegistered;
+  const canGoReady = hasSelectedCampaign && softphoneReadyForDialing;
+  const sessionMetadata = (session?.metadata || {}) as Record<string, unknown>;
+  const displayedEndpoint =
+    (typeof sessionMetadata.endpoint === "string" && sessionMetadata.endpoint) ||
+    (typeof softphoneConfig?.endpoint === "string" && softphoneConfig.endpoint) ||
+    null;
 
   const lead = callInfo?.metadata as Record<string, unknown> | null;
   const leadName =
@@ -460,6 +549,31 @@ export default function DialerAgentPanel() {
     humanReady?.phone ??
     lead?.phone ??
     (typeof callInfo?.metadata?.endpoint === "string" ? callInfo.metadata.endpoint : "—");
+
+  useEffect(() => {
+    logUiState({
+      agentId,
+      externalPhoneMode,
+      selectedCampaign,
+      sessionState: session?.state ?? "OFFLINE",
+      sessionId: session?.session_id ?? null,
+      callId: callInfo?.call_id ?? null,
+      callStatus: callInfo?.status ?? null,
+      displayedEndpoint,
+      campaignCount: campaigns.length,
+    });
+  }, [
+    agentId,
+    callInfo?.call_id,
+    callInfo?.status,
+    campaigns.length,
+    displayedEndpoint,
+    externalPhoneMode,
+    logUiState,
+    selectedCampaign,
+    session?.session_id,
+    session?.state,
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 flex flex-col items-center">
@@ -491,19 +605,22 @@ export default function DialerAgentPanel() {
         <Card className="bg-gray-900 border-gray-700">
           <CardContent className="pt-4 pb-4 flex items-center justify-between gap-3">
             <div>
-              <div className="text-sm text-gray-400">Browser softphone</div>
-              <div className="text-sm text-white font-medium">{softphoneStatusLabel}</div>
-              {softphoneConfig?.endpoint ? (
-                <div className="text-xs text-gray-500 font-mono">{softphoneConfig.endpoint}</div>
+              <div className="text-sm text-gray-400">Phone</div>
+              <div className="text-sm text-white font-medium">External SIP Phone</div>
+              {displayedEndpoint ? (
+                <div className="text-xs text-gray-200 font-mono">Endpoint {displayedEndpoint}</div>
               ) : (
                 <div className="text-xs text-red-400">No endpoint configured in agent softphone metadata</div>
               )}
+              {displayedEndpoint ? (
+                <div className="text-xs text-gray-400 mt-1">This phone is the active agent device</div>
+              ) : null}
               {!externalPhoneMode && softphone.error ? (
                 <div className="text-xs text-red-400 mt-1">{softphone.error}</div>
               ) : null}
             </div>
             <Badge className={(externalPhoneMode || softphone.isRegistered) ? "bg-green-600 text-white" : "bg-gray-700 text-white"}>
-              {softphoneStatusLabel}
+              {(externalPhoneMode || softphone.isRegistered) ? "Active Device" : softphoneStatusLabel}
             </Badge>
           </CardContent>
         </Card>
@@ -512,14 +629,14 @@ export default function DialerAgentPanel() {
         {isOffline && (
           <Card className="bg-gray-900 border-gray-700">
             <CardHeader>
-              <CardTitle className="text-base text-gray-200">Select Campaign</CardTitle>
+              <CardTitle className="text-base text-gray-200">Campaign</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-                <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
-                  <SelectValue placeholder="Choose a campaign…" />
+                <SelectTrigger className="w-full h-11 bg-gray-800 border-gray-600 text-white">
+                  <SelectValue placeholder="Choose a campaign to go READY" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-600">
+                <SelectContent position="popper" sideOffset={6} className="bg-gray-800 border-gray-600 max-h-72 overflow-y-auto z-50">
                   {campaigns.map((c) => (
                     <SelectItem key={c.campaign_id} value={c.campaign_id} className="text-white">
                       {c.name}
@@ -528,13 +645,27 @@ export default function DialerAgentPanel() {
                 </SelectContent>
               </Select>
 
+              {!hasSelectedCampaign ? (
+                <p className="text-xs text-yellow-300">Select a campaign before going READY.</p>
+              ) : (
+                <p className="text-xs text-green-300">Campaign selected. You can now go READY.</p>
+              )}
+
               <Button
                 onClick={goReady}
-                disabled={!selectedCampaign || (!externalPhoneMode && !softphone.isRegistered)}
-                className="w-full bg-green-600 hover:bg-green-500 text-white font-semibold"
+                disabled={!canGoReady}
+                className={`w-full h-11 text-white font-semibold ${
+                  canGoReady
+                    ? "bg-green-600 hover:bg-green-500"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-700"
+                }`}
               >
                 <Phone className="h-4 w-4 mr-2" />
-                {(externalPhoneMode || softphone.isRegistered) ? "Go Ready" : "Waiting For Softphone"}
+                {!hasSelectedCampaign
+                  ? "Select Campaign To Continue"
+                  : softphoneReadyForDialing
+                    ? "Go Ready"
+                    : "Waiting For Softphone"}
               </Button>
             </CardContent>
           </Card>
