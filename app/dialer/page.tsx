@@ -4,13 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -632,18 +625,25 @@ export default function DialerAgentPanel() {
               <CardTitle className="text-base text-gray-200">Campaign</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-                <SelectTrigger className="w-full h-11 bg-gray-800 border-gray-600 text-white">
-                  <SelectValue placeholder="Choose a campaign to go READY" />
-                </SelectTrigger>
-                <SelectContent position="popper" sideOffset={6} className="bg-gray-800 border-gray-600 max-h-72 overflow-y-auto z-50">
-                  {campaigns.map((c) => (
-                    <SelectItem key={c.campaign_id} value={c.campaign_id} className="text-white">
-                      {c.name}
-                    </SelectItem>
+              <div className="space-y-2">
+                <select
+                  value={selectedCampaign}
+                  onChange={(event) => setSelectedCampaign(event.target.value)}
+                  className="w-full h-11 rounded-md border border-gray-600 bg-gray-800 px-3 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                >
+                  <option value="" disabled>
+                    Choose a campaign to go READY
+                  </option>
+                  {campaigns.map((campaign) => (
+                    <option key={campaign.campaign_id} value={campaign.campaign_id}>
+                      {campaign.name}
+                    </option>
                   ))}
-                </SelectContent>
-              </Select>
+                </select>
+                {campaigns.length === 0 ? (
+                  <p className="text-xs text-red-300">No campaigns were loaded for this org yet.</p>
+                ) : null}
+              </div>
 
               {!hasSelectedCampaign ? (
                 <p className="text-xs text-yellow-300">Select a campaign before going READY.</p>
