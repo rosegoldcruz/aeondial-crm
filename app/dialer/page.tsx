@@ -62,6 +62,11 @@ interface Campaign {
   status: string;
 }
 
+interface CampaignOption {
+  value: string;
+  label: string;
+}
+
 interface WsEvent {
   type: string;
   payload?: Record<string, unknown>;
@@ -117,6 +122,13 @@ function normalizeCampaigns(payload: Campaign[]): Campaign[] {
   return [...payload]
     .filter((campaign) => Boolean(campaign.campaign_id))
     .sort((a, b) => (b.status === "active" ? 1 : 0) - (a.status === "active" ? 1 : 0) || a.name.localeCompare(b.name));
+}
+
+function toCampaignOptions(payload: Campaign[]): CampaignOption[] {
+  return payload.map((campaign) => ({
+    value: campaign.campaign_id,
+    label: campaign.name || campaign.campaign_id,
+  }));
 }
 
 function extractCampaigns(raw: unknown): Campaign[] {
@@ -193,6 +205,7 @@ export default function DialerAgentPanel() {
   const uiStateDebugRef = useRef<string | null>(null);
   const campaignFetchDebugLoggedRef = useRef(false);
   const campaignRenderDebugLoggedRef = useRef(false);
+  const campaignStateSetDebugRef = useRef<string | null>(null);
   const softphone = useSoftphone(softphoneConfig);
   const agentId = softphoneConfig?.agent_id || USER_ID;
 
@@ -208,6 +221,18 @@ export default function DialerAgentPanel() {
     if (campaignsDebugRef.current === serialized) return;
     campaignsDebugRef.current = serialized;
     console.debug("[dialer] campaigns payload received", nextCampaigns);
+  }, []);
+
+  const logCampaignStateSet = useCallback((source: string, nextCampaigns: Campaign[]) => {
+    const payload = {
+      source,
+      nextCampaigns,
+      renderedOptions: toCampaignOptions(nextCampaigns),
+    };
+    const serialized = JSON.stringify(payload);
+    if (campaignStateSetDebugRef.current === serialized) return;
+    campaignStateSetDebugRef.current = serialized;
+    console.debug("[dialer] campaigns state set", payload);
   }, []);
 
   const logUiState = useCallback((nextState: Record<string, unknown>) => {
@@ -272,10 +297,8 @@ export default function DialerAgentPanel() {
       const parsedBody = rawBody ? JSON.parse(rawBody) : [];
       const payload = extractCampaigns(parsedBody);
       const normalized = normalizeCampaigns(payload);
-      const campaignOptions = normalized.map((campaign) => ({
-        value: campaign.campaign_id,
-        label: campaign.name || campaign.campaign_id,
-      }));
+      const campaignOptions = toCampaignOptions(normalized);
+      logCampaignStateSet("refreshCampaigns", normalized);
       setCampaigns(normalized);
       logCampaignsPayload(normalized);
       setSelectedCampaign((current) => {
@@ -303,7 +326,7 @@ export default function DialerAgentPanel() {
     } catch {
       // non-fatal
     }
-  }, [DIALER_ORG_ID, agentId, logCampaignsPayload, selectedCampaign, session?.campaign_id]);
+  }, [DIALER_ORG_ID, agentId, logCampaignStateSet, logCampaignsPayload, selectedCampaign, session?.campaign_id]);
 
   useEffect(() => {
     void refreshCampaigns();
@@ -575,6 +598,7 @@ export default function DialerAgentPanel() {
           ? "Softphone Error"
           : "Softphone Idle";
   const autoNextEnabled = Boolean(session) && ["READY", "RESERVED", "WRAP"].includes(agentState);
+  const campaignOptions = toCampaignOptions(campaigns);
   const hasSelectedCampaign = selectedCampaign.trim().length > 0;
   const softphoneReadyForDialing = externalPhoneMode || softphone.isRegistered;
   const canGoReady = hasSelectedCampaign && softphoneReadyForDialing;
@@ -597,9 +621,27 @@ export default function DialerAgentPanel() {
     lead?.phone ??
     (typeof callInfo?.metadata?.endpoint === "string" ? callInfo.metadata.endpoint : "—");
 
+  const deviceBadgeLabel = softphone.isRegistered
+    ? "Active Device"
+    : displayedEndpoint
+      ? "Configured Device"
+      : softphoneStatusLabel;
+  const deviceBadgeClassName = softphone.isRegistered
+    ? "bg-green-600 text-white"
+    : displayedEndpoint
+      ? "bg-blue-700 text-white"
+      : "bg-gray-700 text-white";
+  const deviceStatusCopy = softphone.isRegistered
+    ? "This phone is actively registered"
+    : displayedEndpoint
+      ? "This endpoint is configured for the agent"
+      : "No active device is configured";
+
   useEffect(() => {
     logUiState({
       agentId,
+      campaigns,
+      campaignOptions,
       externalPhoneMode,
       selectedCampaign,
       sessionState: session?.state ?? "OFFLINE",
@@ -611,6 +653,8 @@ export default function DialerAgentPanel() {
     });
   }, [
     agentId,
+    campaignOptions,
+    campaigns,
     callInfo?.call_id,
     callInfo?.status,
     campaigns.length,
@@ -621,6 +665,18 @@ export default function DialerAgentPanel() {
     session?.session_id,
     session?.state,
   ]);
+
+  useEffect(() => {
+    if (!campaignRenderDebugLoggedRef.current && campaignOptions.length === 0) {
+      return;
+    }
+    console.debug("[dialer] campaign render state", {
+      campaigns,
+      renderedOptions: campaignOptions,
+      selectedCampaign,
+    });
+    campaignRenderDebugLoggedRef.current = true;
+  }, [campaignOptions, campaigns, selectedCampaign]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 flex flex-col items-center">
@@ -660,14 +716,14 @@ export default function DialerAgentPanel() {
                 <div className="text-xs text-red-400">No endpoint configured in agent softphone metadata</div>
               )}
               {displayedEndpoint ? (
-                <div className="text-xs text-gray-400 mt-1">This phone is the active agent device</div>
+                <div className="text-xs text-gray-400 mt-1">{deviceStatusCopy}</div>
               ) : null}
               {!externalPhoneMode && softphone.error ? (
                 <div className="text-xs text-red-400 mt-1">{softphone.error}</div>
               ) : null}
             </div>
-            <Badge className={(externalPhoneMode || softphone.isRegistered) ? "bg-green-600 text-white" : "bg-gray-700 text-white"}>
-              {(externalPhoneMode || softphone.isRegistered) ? "Active Device" : softphoneStatusLabel}
+            <Badge className={deviceBadgeClassName}>
+              {deviceBadgeLabel}
             </Badge>
           </CardContent>
         </Card>
@@ -688,9 +744,9 @@ export default function DialerAgentPanel() {
                   <option value="" disabled>
                     Choose a campaign to go READY
                   </option>
-                  {campaigns.map((campaign) => (
-                    <option key={campaign.campaign_id} value={campaign.campaign_id}>
-                      {campaign.name}
+                  {campaignOptions.map((campaign) => (
+                    <option key={campaign.value} value={campaign.value}>
+                      {campaign.label}
                     </option>
                   ))}
                 </select>
