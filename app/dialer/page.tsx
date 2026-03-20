@@ -268,10 +268,9 @@ export default function DialerAgentPanel() {
   // ── Load campaigns ──────────────────────────────────────────────────────────
 
   const refreshCampaigns = useCallback(async () => {
-    const requestUrl = `${BACKEND_URL}/campaigns?org_id=${encodeURIComponent(DIALER_ORG_ID)}`;
+    const requestUrl = `/api/dialer/campaigns?org_id=${encodeURIComponent(DIALER_ORG_ID)}`;
     try {
       const response = await fetch(requestUrl, {
-        headers: getApiHeaders(DIALER_ORG_ID),
         cache: "no-store",
       });
       const rawBody = await response.text();
@@ -323,8 +322,11 @@ export default function DialerAgentPanel() {
           renderedOptions: campaignOptions,
         });
       }
-    } catch {
-      // non-fatal
+    } catch (campaignError) {
+      console.debug("[dialer] campaign fetch failed", {
+        message: campaignError instanceof Error ? campaignError.message : "Unknown campaign fetch failure",
+        requestUrl,
+      });
     }
   }, [DIALER_ORG_ID, agentId, logCampaignStateSet, logCampaignsPayload, selectedCampaign, session?.campaign_id]);
 
@@ -599,6 +601,10 @@ export default function DialerAgentPanel() {
           : "Softphone Idle";
   const autoNextEnabled = Boolean(session) && ["READY", "RESERVED", "WRAP"].includes(agentState);
   const campaignOptions = toCampaignOptions(campaigns);
+  const renderedSelectOptions = [
+    { value: "", label: "Choose a campaign to go READY", disabled: true },
+    ...campaignOptions.map((campaign) => ({ ...campaign, disabled: false })),
+  ];
   const hasSelectedCampaign = selectedCampaign.trim().length > 0;
   const softphoneReadyForDialing = externalPhoneMode || softphone.isRegistered;
   const canGoReady = hasSelectedCampaign && softphoneReadyForDialing;
@@ -671,12 +677,14 @@ export default function DialerAgentPanel() {
       return;
     }
     console.debug("[dialer] campaign render state", {
+      campaignOptionsLength: campaignOptions.length,
       campaigns,
+      optionNodes: renderedSelectOptions,
       renderedOptions: campaignOptions,
       selectedCampaign,
     });
     campaignRenderDebugLoggedRef.current = true;
-  }, [campaignOptions, campaigns, selectedCampaign]);
+  }, [campaignOptions, campaigns, renderedSelectOptions, selectedCampaign]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 flex flex-col items-center">
@@ -741,11 +749,12 @@ export default function DialerAgentPanel() {
                   onChange={(event) => setSelectedCampaign(event.target.value)}
                   className="w-full h-11 rounded-md border border-gray-600 bg-gray-800 px-3 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
                 >
-                  <option value="" disabled>
-                    Choose a campaign to go READY
-                  </option>
-                  {campaignOptions.map((campaign) => (
-                    <option key={campaign.value} value={campaign.value}>
+                  {renderedSelectOptions.map((campaign) => (
+                    <option
+                      key={campaign.value || "__placeholder__"}
+                      value={campaign.value}
+                      disabled={campaign.disabled}
+                    >
                       {campaign.label}
                     </option>
                   ))}
