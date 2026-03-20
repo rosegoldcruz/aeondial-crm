@@ -119,6 +119,16 @@ function normalizeCampaigns(payload: Campaign[]): Campaign[] {
     .sort((a, b) => (b.status === "active" ? 1 : 0) - (a.status === "active" ? 1 : 0) || a.name.localeCompare(b.name));
 }
 
+function extractCampaigns(raw: unknown): Campaign[] {
+  if (Array.isArray(raw)) {
+    return raw as Campaign[];
+  }
+  if (raw && typeof raw === "object" && Array.isArray((raw as { campaigns?: unknown[] }).campaigns)) {
+    return (raw as { campaigns: Campaign[] }).campaigns;
+  }
+  throw new Error("Campaign response was not an array");
+}
+
 function findLiveCallForAgent(
   calls: LiveCall[],
   agentId: string,
@@ -182,6 +192,7 @@ export default function DialerAgentPanel() {
   const campaignsDebugRef = useRef<string | null>(null);
   const uiStateDebugRef = useRef<string | null>(null);
   const campaignFetchDebugLoggedRef = useRef(false);
+  const campaignRenderDebugLoggedRef = useRef(false);
   const softphone = useSoftphone(softphoneConfig);
   const agentId = softphoneConfig?.agent_id || USER_ID;
 
@@ -258,8 +269,13 @@ export default function DialerAgentPanel() {
         throw new Error(rawBody || `Campaign request failed: ${response.status}`);
       }
 
-      const payload = (rawBody ? JSON.parse(rawBody) : []) as Campaign[];
+      const parsedBody = rawBody ? JSON.parse(rawBody) : [];
+      const payload = extractCampaigns(parsedBody);
       const normalized = normalizeCampaigns(payload);
+      const campaignOptions = normalized.map((campaign) => ({
+        value: campaign.campaign_id,
+        label: campaign.name || campaign.campaign_id,
+      }));
       setCampaigns(normalized);
       logCampaignsPayload(normalized);
       setSelectedCampaign((current) => {
@@ -274,10 +290,20 @@ export default function DialerAgentPanel() {
         }
         return current;
       });
+
+      if (!campaignRenderDebugLoggedRef.current) {
+        campaignRenderDebugLoggedRef.current = true;
+        console.debug("[dialer] campaign render mapping", {
+          rawCampaignsResponse: parsedBody,
+          campaignOptions,
+          selectedCampaign,
+          renderedOptions: campaignOptions,
+        });
+      }
     } catch {
       // non-fatal
     }
-  }, [DIALER_ORG_ID, agentId, logCampaignsPayload, session?.campaign_id]);
+  }, [DIALER_ORG_ID, agentId, logCampaignsPayload, selectedCampaign, session?.campaign_id]);
 
   useEffect(() => {
     void refreshCampaigns();
