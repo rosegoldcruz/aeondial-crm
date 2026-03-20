@@ -28,7 +28,7 @@ import {
   CheckCircle2,
   RadioTower,
 } from "lucide-react";
-import { apiPost, apiGet, BACKEND_URL, ORG_ID, USER_ID, toWebSocketUrl } from "@/lib/backend";
+import { apiPost, apiGet, BACKEND_URL, ORG_ID, USER_ID, getApiHeaders, toWebSocketUrl } from "@/lib/backend";
 import { useSoftphone, type SoftphoneConfig } from "@/hooks/use-softphone";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -161,6 +161,7 @@ function useCallTimer(active: boolean, startedAt: string | null): string {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function DialerAgentPanel() {
+  const DIALER_ORG_ID = "default-tenant";
   const [session, setSession] = useState<AgentSession | null>(null);
   const [callInfo, setCallInfo] = useState<LiveCall | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -180,6 +181,7 @@ export default function DialerAgentPanel() {
   const sessionDebugRef = useRef<string | null>(null);
   const campaignsDebugRef = useRef<string | null>(null);
   const uiStateDebugRef = useRef<string | null>(null);
+  const campaignFetchDebugLoggedRef = useRef(false);
   const softphone = useSoftphone(softphoneConfig);
   const agentId = softphoneConfig?.agent_id || USER_ID;
 
@@ -230,8 +232,33 @@ export default function DialerAgentPanel() {
   // ── Load campaigns ──────────────────────────────────────────────────────────
 
   const refreshCampaigns = useCallback(async () => {
+    const requestUrl = `${BACKEND_URL}/campaigns?org_id=${encodeURIComponent(DIALER_ORG_ID)}`;
     try {
-      const payload = await apiGet<Campaign[]>(`/campaigns?org_id=${encodeURIComponent(ORG_ID)}`);
+      const response = await fetch(requestUrl, {
+        headers: getApiHeaders(DIALER_ORG_ID),
+        cache: "no-store",
+      });
+      const rawBody = await response.text();
+
+      if (!campaignFetchDebugLoggedRef.current) {
+        campaignFetchDebugLoggedRef.current = true;
+        console.debug("[dialer] campaign fetch debug", {
+          backendUrl: BACKEND_URL,
+          orgId: DIALER_ORG_ID,
+          envOrgId: ORG_ID,
+          userId: USER_ID,
+          agentId,
+          requestUrl,
+          responseStatus: response.status,
+          rawResponseBody: rawBody,
+        });
+      }
+
+      if (!response.ok) {
+        throw new Error(rawBody || `Campaign request failed: ${response.status}`);
+      }
+
+      const payload = (rawBody ? JSON.parse(rawBody) : []) as Campaign[];
       const normalized = normalizeCampaigns(payload);
       setCampaigns(normalized);
       logCampaignsPayload(normalized);
@@ -250,7 +277,7 @@ export default function DialerAgentPanel() {
     } catch {
       // non-fatal
     }
-  }, [logCampaignsPayload, session?.campaign_id]);
+  }, [DIALER_ORG_ID, agentId, logCampaignsPayload, session?.campaign_id]);
 
   useEffect(() => {
     void refreshCampaigns();
@@ -275,8 +302,8 @@ export default function DialerAgentPanel() {
   const refreshDialerState = useCallback(async () => {
     try {
       const [{ session: nextSession }, liveCalls] = await Promise.all([
-        apiGet<{ session: AgentSession }>(`/dialer/agents/${agentId}/session`),
-        apiGet<LiveCall[]>(`/dialer/calls/live?limit=100`),
+        apiGet<{ session: AgentSession }>(`/dialer/agents/${agentId}/session`, DIALER_ORG_ID),
+        apiGet<LiveCall[]>(`/dialer/calls/live?limit=100`, DIALER_ORG_ID),
       ]);
 
       setSession(nextSession);
@@ -294,7 +321,7 @@ export default function DialerAgentPanel() {
       setSession(null);
       setCallInfo(null);
     }
-  }, [agentId, logSessionPayload]);
+  }, [DIALER_ORG_ID, agentId, logSessionPayload]);
 
   useEffect(() => {
     void refreshDialerState();
@@ -307,7 +334,7 @@ export default function DialerAgentPanel() {
   // ── WebSocket subscription ──────────────────────────────────────────────────
 
   const connectWs = useCallback(() => {
-    const wsUrl = `${toWebSocketUrl(BACKEND_URL)}/ws?org_id=${ORG_ID}`;
+    const wsUrl = `${toWebSocketUrl(BACKEND_URL)}/ws?org_id=${DIALER_ORG_ID}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => setStatusMsg("Live events connected");
@@ -400,7 +427,7 @@ export default function DialerAgentPanel() {
 
     wsRef.current = ws;
     return ws;
-  }, [agentId, callInfo?.call_id, refreshDialerState, session?.state]);
+  }, [DIALER_ORG_ID, agentId, callInfo?.call_id, refreshDialerState, session?.state]);
 
   useEffect(() => {
     const ws = connectWs();
@@ -430,7 +457,7 @@ export default function DialerAgentPanel() {
         campaign_id: selectedCampaign,
         endpoint: softphoneConfig.endpoint,
         softphone: softphoneConfig,
-      });
+      }, DIALER_ORG_ID);
       setSession(res.session);
       setStatusMsg("You are now READY to receive calls");
     } catch (e) {
@@ -445,6 +472,7 @@ export default function DialerAgentPanel() {
       const res = await apiPost<{ session: AgentSession }>(
         `/dialer/agents/${session.session_id}/state`,
         { state, reason },
+        DIALER_ORG_ID,
       );
       setSession(res.session);
     } catch (e) {
@@ -457,10 +485,10 @@ export default function DialerAgentPanel() {
     setError(null);
     try {
       await apiPost("/telephony/calls/end", {
-        org_id: ORG_ID,
+        org_id: DIALER_ORG_ID,
         agent_id: agentId,
         call_id: callInfo.call_id,
-      });
+      }, DIALER_ORG_ID);
       // INCALL → WRAP will come via WebSocket
     } catch (e) {
       setError(e instanceof Error ? e.message : "End call failed");
@@ -476,7 +504,7 @@ export default function DialerAgentPanel() {
         notes: dispNotes || undefined,
         callback_at: dispOutcome === "CALLBACK" && dispCallbackDate ? dispCallbackDate : undefined,
         session_id: session.session_id,
-      });
+      }, DIALER_ORG_ID);
       setShowDispModal(false);
       setDispNotes("");
       setDispCallbackDate("");
