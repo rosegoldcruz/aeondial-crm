@@ -15,26 +15,37 @@ const BACKEND_URL =
 const DEFAULT_ORG_ID =
   sanitizeEnv(process.env.NEXT_PUBLIC_ORG_ID) ||
   sanitizeEnv(process.env.ORG_ID) ||
-  "default-tenant";
+  null;
 const USER_ROLE = sanitizeEnv(process.env.NEXT_PUBLIC_USER_ROLE) || "admin";
 
 export async function GET(request: Request) {
-  const { userId: clerkUserId } = await auth();
-  const devUserId =
-    sanitizeEnv(process.env.NEXT_PUBLIC_USER_ID) ||
-    sanitizeEnv(process.env.USER_ID) ||
-    "crm-user";
-  const userId = clerkUserId || (process.env.NODE_ENV !== "production" ? devUserId : null);
-  if (!userId) {
+  const { userId: clerkUserId, orgId: clerkOrgId } = await auth();
+  const allowDevBypass =
+    process.env.NODE_ENV !== "production" &&
+    sanitizeEnv(process.env.ALLOW_DEV_DIALER_BYPASS) === "true";
+  const devUserId = sanitizeEnv(process.env.NEXT_PUBLIC_USER_ID) || sanitizeEnv(process.env.USER_ID) || null;
+  const orgIdFromQuery = new URL(request.url).searchParams.get("org_id");
+  const orgId =
+    clerkOrgId ||
+    (allowDevBypass ? orgIdFromQuery || DEFAULT_ORG_ID : null);
+  const userId = clerkUserId || (allowDevBypass ? devUserId : null);
+  if (!userId || !orgId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const clerkUser = await currentUser();
-  const email = clerkUser?.emailAddresses?.[0]?.emailAddress || null;
-  const fullName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ") || null;
-  const { searchParams } = new URL(request.url);
-  const orgId = searchParams.get("org_id") || DEFAULT_ORG_ID;
-
+  const email =
+    clerkUser?.emailAddresses?.[0]?.emailAddress ||
+    (allowDevBypass ? sanitizeEnv(process.env.DEV_USER_EMAIL) || null : null);
+  const fullName =
+    [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ") ||
+    clerkUser?.username ||
+    email ||
+    (allowDevBypass ? sanitizeEnv(process.env.DEV_USER_NAME) || null : null);
+  if (!email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const displayName = fullName || email;
   const res = await fetch(`${BACKEND_URL}/campaigns?org_id=${encodeURIComponent(orgId)}`, {
     method: "GET",
     headers: {
@@ -42,8 +53,8 @@ export async function GET(request: Request) {
       "x-org-id": orgId,
       "x-role": USER_ROLE,
       "x-user-id": userId,
-      "x-user-email": email || `${userId}@clerk.local`,
-      "x-user-name": fullName || "CRM User",
+      "x-user-email": email,
+      "x-user-name": displayName,
     },
     cache: "no-store",
   });

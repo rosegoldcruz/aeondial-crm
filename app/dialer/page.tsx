@@ -28,8 +28,9 @@ import {
   CheckCircle2,
   RadioTower,
 } from "lucide-react";
-import { apiPost, apiGet, BACKEND_URL, ORG_ID, USER_ID, getApiHeaders, toWebSocketUrl } from "@/lib/backend";
+import { BACKEND_URL, toWebSocketUrl } from "@/lib/backend";
 import { useSoftphone, type SoftphoneConfig } from "@/hooks/use-softphone";
+import { useAuth } from "@clerk/nextjs";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -204,7 +205,7 @@ function useCallTimer(active: boolean, startedAt: string | null): string {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function DialerAgentPanel() {
-  const DIALER_ORG_ID = "default-tenant";
+  const { userId: clerkUserId } = useAuth();
   const [session, setSession] = useState<AgentSession | null>(null);
   const [callInfo, setCallInfo] = useState<LiveCall | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -228,7 +229,7 @@ export default function DialerAgentPanel() {
   const campaignRenderDebugLoggedRef = useRef(false);
   const campaignStateSetDebugRef = useRef<string | null>(null);
   const softphone = useSoftphone(softphoneConfig);
-  const agentId = softphoneConfig?.agent_id || USER_ID;
+  const agentId = softphoneConfig?.agent_id || clerkUserId || "";
 
   const logSessionPayload = useCallback((nextSession: AgentSession | null) => {
     const serialized = JSON.stringify(nextSession);
@@ -263,6 +264,20 @@ export default function DialerAgentPanel() {
     console.debug("[dialer] normalized UI state derived from backend", nextState);
   }, []);
 
+  const postLocal = useCallback(async <T,>(path: string, body: Record<string, unknown>): Promise<T> => {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(errorText || `Request failed: ${res.status}`);
+    }
+    return (await res.json()) as T;
+  }, []);
+
   const callTimer = useCallTimer(
     session?.state === "INCALL",
     callInfo?.started_at ?? null,
@@ -289,7 +304,7 @@ export default function DialerAgentPanel() {
   // ── Load campaigns ──────────────────────────────────────────────────────────
 
   const refreshCampaigns = useCallback(async () => {
-    const requestUrl = `/api/dialer/campaigns?org_id=${encodeURIComponent(DIALER_ORG_ID)}`;
+    const requestUrl = `/api/dialer/campaigns`;
     try {
       const response = await fetch(requestUrl, {
         cache: "no-store",
@@ -300,9 +315,9 @@ export default function DialerAgentPanel() {
         campaignFetchDebugLoggedRef.current = true;
         console.debug("[dialer] campaign fetch debug", {
           backendUrl: BACKEND_URL,
-          orgId: DIALER_ORG_ID,
-          envOrgId: ORG_ID,
-          userId: USER_ID,
+          orgId: softphoneConfig?.org_id ?? null,
+          envOrgId: null,
+          userId: clerkUserId ?? null,
           agentId,
           requestUrl,
           responseStatus: response.status,
@@ -349,7 +364,7 @@ export default function DialerAgentPanel() {
         requestUrl,
       });
     }
-  }, [DIALER_ORG_ID, agentId, logCampaignStateSet, logCampaignsPayload, selectedCampaign, session?.campaign_id]);
+  }, [agentId, clerkUserId, logCampaignStateSet, logCampaignsPayload, selectedCampaign, session?.campaign_id, softphoneConfig?.org_id]);
 
   useEffect(() => {
     void refreshCampaigns();
@@ -373,10 +388,16 @@ export default function DialerAgentPanel() {
 
   const refreshDialerState = useCallback(async () => {
     try {
-      const [{ session: nextSession }, liveCalls] = await Promise.all([
-        apiGet<{ session: AgentSession }>(`/dialer/agents/${agentId}/session`, DIALER_ORG_ID),
-        apiGet<LiveCall[]>(`/dialer/calls/live?limit=100`, DIALER_ORG_ID),
+      const [sessionRes, callsRes] = await Promise.all([
+        fetch(`/api/dialer/agents/${encodeURIComponent(agentId)}/session`, { cache: "no-store" }),
+        fetch(`/api/dialer/calls/live?limit=100`, { cache: "no-store" }),
       ]);
+      if (!sessionRes.ok || !callsRes.ok) {
+        throw new Error("Failed to load dialer state");
+      }
+      const sessionJson = (await sessionRes.json()) as { session: AgentSession };
+      const nextSession = sessionJson.session;
+      const liveCalls = (await callsRes.json()) as LiveCall[];
 
       setSession(nextSession);
       logSessionPayload(nextSession);
@@ -393,7 +414,7 @@ export default function DialerAgentPanel() {
       setSession(null);
       setCallInfo(null);
     }
-  }, [DIALER_ORG_ID, agentId, logSessionPayload]);
+  }, [agentId, logSessionPayload]);
 
   useEffect(() => {
     void refreshDialerState();
@@ -406,7 +427,11 @@ export default function DialerAgentPanel() {
   // ── WebSocket subscription ──────────────────────────────────────────────────
 
   const connectWs = useCallback(() => {
-    const wsUrl = `${toWebSocketUrl(BACKEND_URL)}/ws?org_id=${DIALER_ORG_ID}`;
+    const wsOrgId = softphoneConfig?.org_id;
+    if (!wsOrgId) {
+      return { close: () => undefined } as unknown as WebSocket;
+    }
+    const wsUrl = `${toWebSocketUrl(BACKEND_URL)}/ws?org_id=${encodeURIComponent(wsOrgId)}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => setStatusMsg("Live events connected");
@@ -499,7 +524,7 @@ export default function DialerAgentPanel() {
 
     wsRef.current = ws;
     return ws;
-  }, [DIALER_ORG_ID, agentId, callInfo?.call_id, refreshDialerState, session?.state]);
+  }, [agentId, callInfo?.call_id, refreshDialerState, session?.state, softphoneConfig?.org_id]);
 
   useEffect(() => {
     const ws = connectWs();
@@ -520,12 +545,12 @@ export default function DialerAgentPanel() {
     }
     setError(null);
     try {
-      const res = await apiPost<{ session: AgentSession }>("/dialer/agents/session", {
+      const res = await postLocal<{ session: AgentSession }>("/api/dialer/agents/session", {
         agent_id: agentId,
         campaign_id: selectedCampaign,
         endpoint: softphoneConfig.endpoint,
         softphone: softphoneConfig,
-      }, DIALER_ORG_ID);
+      });
       setSession(res.session);
       setStatusMsg("You are now READY to receive calls");
     } catch (e) {
@@ -537,10 +562,9 @@ export default function DialerAgentPanel() {
     if (!session) return;
     setError(null);
     try {
-      const res = await apiPost<{ session: AgentSession }>(
-        `/dialer/agents/${session.session_id}/state`,
+      const res = await postLocal<{ session: AgentSession }>(
+        `/api/dialer/agents/${session.session_id}/state`,
         { state, reason },
-        DIALER_ORG_ID,
       );
       setSession(res.session);
     } catch (e) {
@@ -552,11 +576,10 @@ export default function DialerAgentPanel() {
     if (!callInfo) return;
     setError(null);
     try {
-      await apiPost("/telephony/calls/end", {
-        org_id: DIALER_ORG_ID,
+      await postLocal("/api/telephony/calls/end", {
         agent_id: agentId,
         call_id: callInfo.call_id,
-      }, DIALER_ORG_ID);
+      });
       // INCALL → WRAP will come via WebSocket
     } catch (e) {
       setError(e instanceof Error ? e.message : "End call failed");
@@ -567,12 +590,12 @@ export default function DialerAgentPanel() {
     if (!session || !callInfo) return;
     setError(null);
     try {
-      await apiPost(`/dialer/calls/${callInfo.call_id}/disposition`, {
+      await postLocal(`/api/dialer/calls/${callInfo.call_id}/disposition`, {
         outcome: dispOutcome,
         notes: dispNotes || undefined,
         callback_at: dispOutcome === "CALLBACK" && dispCallbackDate ? dispCallbackDate : undefined,
         session_id: session.session_id,
-      }, DIALER_ORG_ID);
+      });
       setShowDispModal(false);
       setDispNotes("");
       setDispCallbackDate("");

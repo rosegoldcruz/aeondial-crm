@@ -14,10 +14,13 @@ const isDevDialerRoute = createRouteMatcher([
 ])
 
 export default clerkMiddleware(async (auth, req) => {
+  const allowDevBypass =
+    process.env.NODE_ENV !== "production" &&
+    process.env.ALLOW_DEV_DIALER_BYPASS === "true"
   const allowDevDialerApi =
-    process.env.NODE_ENV !== "production" && isDevDialerApiRoute(req)
+    allowDevBypass && isDevDialerApiRoute(req)
   const allowDevDialerRoute =
-    process.env.NODE_ENV !== "production" && isDevDialerRoute(req)
+    allowDevBypass && isDevDialerRoute(req)
   if (!isPublicRoute(req) && !allowDevDialerApi && !allowDevDialerRoute) {
     await auth.protect()
   }
