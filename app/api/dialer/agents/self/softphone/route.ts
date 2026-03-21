@@ -32,9 +32,6 @@ export async function GET() {
       "x-user-id": userId,
       "x-user-email": email || `${userId}@clerk.local`,
       "x-user-name": fullName || "Daniel Cruz",
-      "x-softphone-endpoint": "4699",
-      "x-softphone-transport": "udp",
-      "x-softphone-host": "137.184.126.46",
     },
     cache: "no-store",
   });

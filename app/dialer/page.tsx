@@ -58,8 +58,8 @@ interface LiveCall {
 
 interface Campaign {
   campaign_id: string;
-  name: string;
-  status: string;
+  name?: string | null;
+  status?: string | null;
 }
 
 interface CampaignOption {
@@ -120,8 +120,20 @@ function stateBadge(state: AgentState): string {
 
 function normalizeCampaigns(payload: Campaign[]): Campaign[] {
   return [...payload]
-    .filter((campaign) => Boolean(campaign.campaign_id))
-    .sort((a, b) => (b.status === "active" ? 1 : 0) - (a.status === "active" ? 1 : 0) || a.name.localeCompare(b.name));
+    .map((campaign) => ({
+      campaign_id: typeof campaign.campaign_id === "string" ? campaign.campaign_id.trim() : "",
+      name: typeof campaign.name === "string" ? campaign.name.trim() : null,
+      status: typeof campaign.status === "string" ? campaign.status.trim().toLowerCase() : null,
+    }))
+    .filter((campaign) => campaign.campaign_id.length > 0)
+    .sort((a, b) => {
+      const aActive = a.status === "active";
+      const bActive = b.status === "active";
+      if (aActive !== bActive) return aActive ? -1 : 1;
+      const aLabel = a.name || a.campaign_id;
+      const bLabel = b.name || b.campaign_id;
+      return aLabel.localeCompare(bLabel);
+    });
 }
 
 function toCampaignOptions(payload: Campaign[]): CampaignOption[] {
@@ -135,10 +147,30 @@ function extractCampaigns(raw: unknown): Campaign[] {
   if (Array.isArray(raw)) {
     return raw as Campaign[];
   }
-  if (raw && typeof raw === "object" && Array.isArray((raw as { campaigns?: unknown[] }).campaigns)) {
-    return (raw as { campaigns: Campaign[] }).campaigns;
+  if (raw && typeof raw === "object") {
+    const record = raw as {
+      campaigns?: unknown[];
+      data?: unknown[];
+      items?: unknown[];
+      results?: unknown[];
+    };
+    if (Array.isArray(record.campaigns)) return record.campaigns as Campaign[];
+    if (Array.isArray(record.data)) return record.data as Campaign[];
+    if (Array.isArray(record.items)) return record.items as Campaign[];
+    if (Array.isArray(record.results)) return record.results as Campaign[];
   }
   throw new Error("Campaign response was not an array");
+}
+
+function isBackendRegistered(config: SoftphoneConfig | null): boolean {
+  if (!config || typeof config !== "object") return false;
+  const metadata = (config as SoftphoneConfig & { metadata?: Record<string, unknown> | null }).metadata;
+  const registrationState =
+    typeof metadata?.registration_status === "string"
+      ? metadata.registration_status.trim().toLowerCase()
+      : null;
+  const registeredFlag = metadata?.is_registered;
+  return registrationState === "registered" || registeredFlag === true || registeredFlag === "true";
 }
 
 function findLiveCallForAgent(
@@ -490,15 +522,9 @@ export default function DialerAgentPanel() {
   async function goReady() {
     if (!selectedCampaign) { setError("Select a campaign first"); return; }
     if (!softphoneConfig?.endpoint) { setError("Softphone endpoint is not configured"); return; }
-    const browserSoftphoneConfigured = Boolean(
-      softphoneConfig?.sip_uri &&
-      softphoneConfig?.authorization_username &&
-      softphoneConfig?.password &&
-      softphoneConfig?.ws_server,
-    );
-    const externalPhoneMode = Boolean(softphoneConfig?.endpoint) && !browserSoftphoneConfigured;
-    if (!externalPhoneMode && !softphone.isRegistered) {
-      setError("Softphone must be registered before going READY");
+    const registrationConfirmed = softphone.isRegistered || isBackendRegistered(softphoneConfig);
+    if (!registrationConfirmed) {
+      setError("SIP registration is not confirmed. Register the phone before going READY.");
       return;
     }
     setError(null);
@@ -588,17 +614,22 @@ export default function DialerAgentPanel() {
     softphoneConfig?.password &&
     softphoneConfig?.ws_server,
   );
-  const externalPhoneMode = Boolean(softphoneConfig?.endpoint) && !browserSoftphoneConfigured;
+  const registrationConfirmed = softphone.isRegistered || isBackendRegistered(softphoneConfig);
   const softphoneStatusLabel =
-    externalPhoneMode
-      ? "External SIP Phone"
-      : softphone.status === "registered"
+    registrationConfirmed
       ? "Registered"
       : softphone.status === "connecting"
-        ? "Registering..."
-        : softphone.status === "error"
-          ? "Softphone Error"
-          : "Softphone Idle";
+      ? "Registering..."
+      : softphone.status === "error"
+        ? "Softphone Error"
+        : browserSoftphoneConfigured
+          ? "Softphone Idle"
+          : "Registration Unverified";
+  const externalPhoneMode = Boolean(softphoneConfig?.endpoint) && !browserSoftphoneConfigured;
+  const uiPhoneTypeLabel =
+    externalPhoneMode ? "External SIP Phone" : "Browser Softphone";
+  const connectionStateLabel =
+    registrationConfirmed ? "Connected" : "Not Connected";
   const autoNextEnabled = Boolean(session) && ["READY", "RESERVED", "WRAP"].includes(agentState);
   const campaignOptions = toCampaignOptions(campaigns);
   const renderedSelectOptions = [
@@ -606,7 +637,7 @@ export default function DialerAgentPanel() {
     ...campaignOptions.map((campaign) => ({ ...campaign, disabled: false })),
   ];
   const hasSelectedCampaign = selectedCampaign.trim().length > 0;
-  const softphoneReadyForDialing = externalPhoneMode || softphone.isRegistered;
+  const softphoneReadyForDialing = registrationConfirmed;
   const canGoReady = hasSelectedCampaign && softphoneReadyForDialing;
   const sessionMetadata = (session?.metadata || {}) as Record<string, unknown>;
   const displayedEndpoint =
@@ -627,20 +658,20 @@ export default function DialerAgentPanel() {
     lead?.phone ??
     (typeof callInfo?.metadata?.endpoint === "string" ? callInfo.metadata.endpoint : "—");
 
-  const deviceBadgeLabel = softphone.isRegistered
-    ? "Active Device"
+  const deviceBadgeLabel = registrationConfirmed
+    ? "Connected"
     : displayedEndpoint
-      ? "Configured Device"
+      ? "Configured (Unverified)"
       : softphoneStatusLabel;
-  const deviceBadgeClassName = softphone.isRegistered
+  const deviceBadgeClassName = registrationConfirmed
     ? "bg-green-600 text-white"
     : displayedEndpoint
-      ? "bg-blue-700 text-white"
+      ? "bg-yellow-700 text-white"
       : "bg-gray-700 text-white";
-  const deviceStatusCopy = softphone.isRegistered
-    ? "This phone is actively registered"
+  const deviceStatusCopy = registrationConfirmed
+    ? "SIP registration is confirmed"
     : displayedEndpoint
-      ? "This endpoint is configured for the agent"
+      ? "Endpoint exists, but registration is not confirmed"
       : "No active device is configured";
 
   useEffect(() => {
@@ -717,7 +748,8 @@ export default function DialerAgentPanel() {
           <CardContent className="pt-4 pb-4 flex items-center justify-between gap-3">
             <div>
               <div className="text-sm text-gray-400">Phone</div>
-              <div className="text-sm text-white font-medium">External SIP Phone</div>
+              <div className="text-sm text-white font-medium">{uiPhoneTypeLabel}</div>
+              <div className="text-xs text-gray-300 mt-1">Connection: {connectionStateLabel}</div>
               {displayedEndpoint ? (
                 <div className="text-xs text-gray-200 font-mono">Endpoint {displayedEndpoint}</div>
               ) : (
