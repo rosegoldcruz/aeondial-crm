@@ -7,6 +7,8 @@ function sanitizeEnv(value: string | undefined): string | undefined {
 }
 
 const BACKEND_URL =
+  sanitizeEnv(process.env.AEONDIAL_BACKEND_URL) ||
+  sanitizeEnv(process.env.BACKEND_URL) ||
   sanitizeEnv(process.env.NEXT_PUBLIC_AEONDIAL_BACKEND_URL) ||
   sanitizeEnv(process.env.NEXT_PUBLIC_BACKEND_URL) ||
   "http://localhost:4000";
@@ -17,7 +19,12 @@ const DEFAULT_ORG_ID =
 const USER_ROLE = sanitizeEnv(process.env.NEXT_PUBLIC_USER_ROLE) || "admin";
 
 export async function GET(request: Request) {
-  const { userId } = await auth();
+  const { userId: clerkUserId } = await auth();
+  const devUserId =
+    sanitizeEnv(process.env.NEXT_PUBLIC_USER_ID) ||
+    sanitizeEnv(process.env.USER_ID) ||
+    "crm-user";
+  const userId = clerkUserId || (process.env.NODE_ENV !== "production" ? devUserId : null);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

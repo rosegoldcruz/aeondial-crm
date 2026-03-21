@@ -6,9 +6,19 @@ const isPublicRoute = createRouteMatcher([
   "/register(.*)",
   "/api/health(.*)",
 ])
+const isDevDialerApiRoute = createRouteMatcher([
+  "/api/dialer/(.*)",
+])
+const isDevDialerRoute = createRouteMatcher([
+  "/dialer(.*)",
+])
 
 export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
+  const allowDevDialerApi =
+    process.env.NODE_ENV !== "production" && isDevDialerApiRoute(req)
+  const allowDevDialerRoute =
+    process.env.NODE_ENV !== "production" && isDevDialerRoute(req)
+  if (!isPublicRoute(req) && !allowDevDialerApi && !allowDevDialerRoute) {
     await auth.protect()
   }
 })
