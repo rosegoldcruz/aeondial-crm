@@ -11,6 +11,10 @@ export interface SoftphoneConfig {
   password: string | null;
   ws_server: string | null;
   display_name?: string | null;
+  registration_status?: "registered" | "unregistered" | "unknown" | null;
+  registration_source?: "ari" | "none" | null;
+  registration_reason?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 type SoftphoneStatus = "idle" | "connecting" | "registered" | "error";

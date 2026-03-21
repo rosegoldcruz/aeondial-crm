@@ -162,17 +162,6 @@ function extractCampaigns(raw: unknown): Campaign[] {
   throw new Error("Campaign response was not an array");
 }
 
-function isBackendRegistered(config: SoftphoneConfig | null): boolean {
-  if (!config || typeof config !== "object") return false;
-  const metadata = (config as SoftphoneConfig & { metadata?: Record<string, unknown> | null }).metadata;
-  const registrationState =
-    typeof metadata?.registration_status === "string"
-      ? metadata.registration_status.trim().toLowerCase()
-      : null;
-  const registeredFlag = metadata?.is_registered;
-  return registrationState === "registered" || registeredFlag === true || registeredFlag === "true";
-}
-
 function findLiveCallForAgent(
   calls: LiveCall[],
   agentId: string,
@@ -522,7 +511,9 @@ export default function DialerAgentPanel() {
   async function goReady() {
     if (!selectedCampaign) { setError("Select a campaign first"); return; }
     if (!softphoneConfig?.endpoint) { setError("Softphone endpoint is not configured"); return; }
-    const registrationConfirmed = softphone.isRegistered || isBackendRegistered(softphoneConfig);
+    const backendRegistrationVerified =
+      softphoneConfig?.registration_source === "ari" && softphoneConfig?.registration_status === "registered";
+    const registrationConfirmed = softphone.isRegistered || backendRegistrationVerified;
     if (!registrationConfirmed) {
       setError("SIP registration is not confirmed. Register the phone before going READY.");
       return;
@@ -614,7 +605,12 @@ export default function DialerAgentPanel() {
     softphoneConfig?.password &&
     softphoneConfig?.ws_server,
   );
-  const registrationConfirmed = softphone.isRegistered || isBackendRegistered(softphoneConfig);
+  const backendRegistrationVerified =
+    softphoneConfig?.registration_source === "ari" && softphoneConfig?.registration_status === "registered";
+  const registrationUnknown =
+    softphoneConfig?.registration_status === "unknown" ||
+    softphoneConfig?.registration_source !== "ari";
+  const registrationConfirmed = softphone.isRegistered || backendRegistrationVerified;
   const softphoneStatusLabel =
     registrationConfirmed
       ? "Registered"
@@ -628,8 +624,7 @@ export default function DialerAgentPanel() {
   const externalPhoneMode = Boolean(softphoneConfig?.endpoint) && !browserSoftphoneConfigured;
   const uiPhoneTypeLabel =
     externalPhoneMode ? "External SIP Phone" : "Browser Softphone";
-  const connectionStateLabel =
-    registrationConfirmed ? "Connected" : "Not Connected";
+  const connectionStateLabel = registrationConfirmed ? "Connected" : "Not Connected";
   const autoNextEnabled = Boolean(session) && ["READY", "RESERVED", "WRAP"].includes(agentState);
   const campaignOptions = toCampaignOptions(campaigns);
   const renderedSelectOptions = [
@@ -671,7 +666,9 @@ export default function DialerAgentPanel() {
   const deviceStatusCopy = registrationConfirmed
     ? "SIP registration is confirmed"
     : displayedEndpoint
-      ? "Endpoint exists, but registration is not confirmed"
+      ? registrationUnknown
+        ? "Device may be online locally, but backend registration is not confirmed"
+        : "Endpoint exists, but registration is not confirmed"
       : "No active device is configured";
 
   useEffect(() => {
@@ -798,6 +795,8 @@ export default function DialerAgentPanel() {
 
               {!hasSelectedCampaign ? (
                 <p className="text-xs text-yellow-300">Select a campaign before going READY.</p>
+              ) : !softphoneReadyForDialing ? (
+                <p className="text-xs text-yellow-300">Campaign selected. Waiting for verified SIP registration.</p>
               ) : (
                 <p className="text-xs text-green-300">Campaign selected. You can now go READY.</p>
               )}
