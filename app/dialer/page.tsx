@@ -63,19 +63,22 @@ interface CampaignStatus {
   queue: { waiting: number; active: number; failed: number; completed: number };
   agents: { ready: number; incall: number };
   leads: { pending: number };
-  live_calls_data: Array<{ call_id: string; contact_id?: string; lead_id?: string; status?: string }>;
+  live_calls_data: Array<{ call_id: string; contact_id?: string; lead_id?: string; status?: string; metadata?: JsonRecord }>;
 }
 
 const DISPOSITION_OPTIONS = [
-  { value: "ANSWERED_HUMAN", label: "Answered", color: "bg-green-600" },
-  { value: "NO_ANSWER", label: "No Answer", color: "bg-yellow-600" },
-  { value: "ANSWERED_MACHINE", label: "Voicemail", color: "bg-yellow-600" },
-  { value: "BUSY", label: "Busy", color: "bg-orange-600" },
-  { value: "CALLBACK", label: "Callback", color: "bg-blue-600" },
-  { value: "NOT_INTERESTED", label: "Not Interested", color: "bg-gray-600" },
-  { value: "WRONG_NUMBER", label: "Wrong Number", color: "bg-red-600" },
-  { value: "DNC", label: "DNC", color: "bg-red-800" },
-  { value: "SALE", label: "Sale", color: "bg-emerald-600" },
+  { value: "interested", label: "Interested", color: "bg-green-600" },
+  { value: "qualified", label: "Qualified", color: "bg-green-700" },
+  { value: "appointment_set", label: "Appointment", color: "bg-green-800" },
+  { value: "sale", label: "Sale", color: "bg-emerald-600" },
+  { value: "callback_requested", label: "Callback", color: "bg-blue-600" },
+  { value: "no_answer", label: "No Answer", color: "bg-yellow-600" },
+  { value: "voicemail", label: "Voicemail", color: "bg-yellow-700" },
+  { value: "busy", label: "Busy", color: "bg-orange-600" },
+  { value: "not_interested", label: "Not Interested", color: "bg-gray-600" },
+  { value: "wrong_number", label: "Wrong Number", color: "bg-red-600" },
+  { value: "bad_number", label: "Bad Number", color: "bg-red-700" },
+  { value: "do_not_call", label: "DNC", color: "bg-red-800" },
 ] as const;
 
 function extractCampaigns(raw: unknown): JsonRecord[] {
@@ -124,9 +127,11 @@ export default function DialerPage() {
 
   // Disposition
   const [lastCallId, setLastCallId] = useState<string | null>(null);
+  const [lastCallAttemptId, setLastCallAttemptId] = useState<string | null>(null);
   const [dispositionPending, setDispositionPending] = useState(false);
   const [dispositionDone, setDispositionDone] = useState(false);
   const [dispositionNotes, setDispositionNotes] = useState("");
+  const [callbackAt, setCallbackAt] = useState("");
 
   // Load contract
   useEffect(() => {
@@ -199,8 +204,12 @@ export default function DialerPage() {
             const latest = data.live_calls_data[data.live_calls_data.length - 1];
             if (typeof latest.call_id === "string" && latest.call_id !== lastCallId) {
               setLastCallId(latest.call_id);
+              const meta = latest.metadata as JsonRecord | undefined;
+              const attemptId = typeof meta?.call_attempt_id === "string" ? meta.call_attempt_id : null;
+              setLastCallAttemptId(attemptId);
               setDispositionDone(false);
               setDispositionNotes("");
+              setCallbackAt("");
             }
           }
         }
@@ -305,27 +314,43 @@ export default function DialerPage() {
     }
   }, [sessionId, campaignStatus]);
 
-  // Submit disposition
+  // Submit disposition (wrap-up)
   const submitDisposition = useCallback(async (outcome: string) => {
-    if (!lastCallId || dispositionPending) return;
+    if (dispositionPending) return;
+    // Prefer call_attempt_id for new wrap-up endpoint, fall back to legacy
+    const attemptId = lastCallAttemptId;
+    if (!attemptId && !lastCallId) return;
     setDispositionPending(true);
     try {
-      await fetch(`/api/dialer/calls/${encodeURIComponent(lastCallId)}/disposition`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          outcome,
-          notes: dispositionNotes || undefined,
-          session_id: sessionId || undefined,
-        }),
-      });
+      if (attemptId) {
+        await fetch(`/api/dialer/call-attempts/${encodeURIComponent(attemptId)}/wrap-up`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            agent_disposition: outcome,
+            notes: dispositionNotes || undefined,
+            callback_at: outcome === "callback_requested" && callbackAt ? callbackAt : undefined,
+          }),
+        });
+      } else {
+        // Legacy fallback for calls without an attempt row
+        await fetch(`/api/dialer/calls/${encodeURIComponent(lastCallId!)}/disposition`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            outcome,
+            notes: dispositionNotes || undefined,
+            session_id: sessionId || undefined,
+          }),
+        });
+      }
       setDispositionDone(true);
     } catch {
       // fail silently
     } finally {
       setDispositionPending(false);
     }
-  }, [lastCallId, dispositionPending, dispositionNotes, sessionId]);
+  }, [lastCallId, lastCallAttemptId, dispositionPending, dispositionNotes, callbackAt, sessionId]);
 
   return (
     <div className="min-h-screen bg-gray-950 p-4 text-white">
@@ -561,7 +586,7 @@ export default function DialerPage() {
                       </div>
                     ) : (
                       <>
-                        <div className="text-xs text-gray-400">Call: {lastCallId.slice(0, 12)}…</div>
+                        <div className="text-xs text-gray-400">Call: {lastCallId.slice(0, 12)}…{lastCallAttemptId ? ` | Attempt: ${lastCallAttemptId.slice(0, 8)}…` : ""}</div>
                         <div className="grid grid-cols-3 gap-2">
                           {DISPOSITION_OPTIONS.map((d) => (
                             <Button
@@ -573,6 +598,17 @@ export default function DialerPage() {
                               {d.label}
                             </Button>
                           ))}
+                        </div>
+                        {/* Callback datetime picker */}
+                        <div className="space-y-1">
+                          <label className="block text-xs text-gray-400" htmlFor="callback-at">Callback date/time (for Callback disposition)</label>
+                          <input
+                            id="callback-at"
+                            type="datetime-local"
+                            value={callbackAt}
+                            onChange={(e) => setCallbackAt(e.target.value)}
+                            className="h-9 w-full rounded-md border border-gray-700 bg-gray-950 px-3 text-sm text-white outline-none focus:border-blue-500"
+                          />
                         </div>
                         <p className="text-xs text-gray-500">Notes from above will be included with the disposition.</p>
                       </>
