@@ -60,6 +60,12 @@ interface ReadyResult {
   text: string;
 }
 
+interface CampaignStartResult {
+  ok: boolean;
+  status: number;
+  text: string;
+}
+
 interface CampaignOption {
   campaign_id: string;
   label: string;
@@ -104,6 +110,8 @@ export default function DialerContractPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [readyPending, setReadyPending] = useState(false);
   const [readyResult, setReadyResult] = useState<ReadyResult | null>(null);
+  const [campaignStartPending, setCampaignStartPending] = useState(false);
+  const [campaignStartResult, setCampaignStartResult] = useState<CampaignStartResult | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -222,6 +230,31 @@ export default function DialerContractPage() {
       });
     } finally {
       setReadyPending(false);
+    }
+  }
+
+  const sessionArmed = readyResult?.ok === true;
+
+  async function startCampaign() {
+    if (!selectedCampaign || !sessionArmed) return;
+    setCampaignStartPending(true);
+    setCampaignStartResult(null);
+
+    try {
+      const response = await fetch(`/api/dialer/campaigns/${encodeURIComponent(selectedCampaign)}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const text = await response.text();
+      setCampaignStartResult({ ok: response.ok, status: response.status, text });
+    } catch (error) {
+      setCampaignStartResult({
+        ok: false,
+        status: 0,
+        text: error instanceof Error ? error.message : "Campaign start failed",
+      });
+    } finally {
+      setCampaignStartPending(false);
     }
   }
 
@@ -361,10 +394,10 @@ export default function DialerContractPage() {
 
                   <Button
                     onClick={goReady}
-                    disabled={!readyEnabled || readyPending}
+                    disabled={!readyEnabled || readyPending || sessionArmed}
                     className="h-11 w-full bg-green-600 font-semibold text-white hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-300"
                   >
-                    {readyPending ? "Sending READY…" : "READY"}
+                    {readyPending ? "Arming Session…" : sessionArmed ? "✓ Session Armed" : "1. Arm Agent Session"}
                   </Button>
 
                   {readyResult ? (
@@ -377,10 +410,43 @@ export default function DialerContractPage() {
                     >
                       <div className="mb-2 flex items-center gap-2 font-medium">
                         {readyResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                        READY response {readyResult.status}
+                        Session {readyResult.ok ? "armed — agent is READY" : `failed (${readyResult.status})`}
                       </div>
                       <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs">
                         {readyResult.text}
+                      </pre>
+                    </div>
+                  ) : null}
+
+                  <Button
+                    onClick={startCampaign}
+                    disabled={!sessionArmed || campaignStartPending || campaignStartResult?.ok === true}
+                    className="h-11 w-full bg-blue-600 font-semibold text-white hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-300"
+                  >
+                    {campaignStartPending
+                      ? "Starting Dialer…"
+                      : campaignStartResult?.ok
+                        ? "✓ Campaign Dialer Running"
+                        : "2. Start Campaign Dialer"}
+                  </Button>
+                  <p className="text-xs text-gray-500">
+                    Step 1 arms the agent session. Step 2 starts the campaign dialer engine which will pick up queued leads, originate via ARI, and bridge to endpoint {contract.registration.endpoint || "—"}.
+                  </p>
+
+                  {campaignStartResult ? (
+                    <div
+                      className={`rounded-md border p-3 text-sm ${
+                        campaignStartResult.ok
+                          ? "border-blue-800 bg-blue-950/40 text-blue-200"
+                          : "border-red-800 bg-red-950/40 text-red-200"
+                      }`}
+                    >
+                      <div className="mb-2 flex items-center gap-2 font-medium">
+                        {campaignStartResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                        Campaign dialer {campaignStartResult.ok ? "started" : `failed (${campaignStartResult.status})`}
+                      </div>
+                      <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs">
+                        {campaignStartResult.text}
                       </pre>
                     </div>
                   ) : null}
