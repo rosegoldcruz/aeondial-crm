@@ -109,6 +109,36 @@ interface ActiveCallData {
   } | null;
 }
 
+interface WrapUpData {
+  has_wrap_up: boolean;
+  session_id?: string | null;
+  campaign?: { id: string; name: string | null } | null;
+  lead?: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    phone: string | null;
+    status: string | null;
+    latest_note: string | null;
+    last_agent_disposition: string | null;
+    do_not_call: boolean;
+    attempt_count: number;
+  } | null;
+  call_attempt?: {
+    id: string;
+    call_id: string;
+    system_outcome: string | null;
+    agent_disposition: string | null;
+    wrap_up_status: string | null;
+    started_at: string | null;
+    answered_at: string | null;
+    bridged_at: string | null;
+    ended_at: string | null;
+    duration_seconds: number | null;
+    talk_seconds: number | null;
+  } | null;
+}
+
 const DISPOSITION_OPTIONS = [
   { value: "interested", label: "Interested", color: "bg-green-600" },
   { value: "qualified", label: "Qualified", color: "bg-green-700" },
@@ -205,6 +235,12 @@ export default function DialerPage() {
   // Active call context (the main thing)
   const [activeCall, setActiveCall] = useState<ActiveCallData | null>(null);
 
+  // Wrap-up context (ended call needing disposition)
+  const [wrapUp, setWrapUp] = useState<WrapUpData | null>(null);
+
+  // Hangup
+  const [hangupPending, setHangupPending] = useState(false);
+
   // Disposition state
   const [dispositionPending, setDispositionPending] = useState(false);
   const [dispositionDone, setDispositionDone] = useState(false);
@@ -279,23 +315,33 @@ export default function DialerPage() {
     return () => { cancelled = true; clearInterval(interval); };
   }, [dialerRunning, selectedCampaign]);
 
-  // ── Polling: active-call context (every 2s while dialer running or wrapping up) ──
+  // ── Polling: active-call + wrap-up context (every 2s while dialer running or has state) ──
   useEffect(() => {
-    if (!dialerRunning && !activeCall?.has_active_call) return;
+    if (!dialerRunning && !activeCall?.has_active_call && !wrapUp?.has_wrap_up) return;
     let cancelled = false;
     async function poll() {
       try {
-        const res = await fetch("/api/dialer/agents/self/active-call");
-        if (res.ok && !cancelled) {
-          const data = (await res.json()) as ActiveCallData;
+        const [acRes, wuRes] = await Promise.all([
+          fetch("/api/dialer/agents/self/active-call"),
+          fetch("/api/dialer/agents/self/wrap-up"),
+        ]);
+        if (cancelled) return;
+        if (acRes.ok) {
+          const data = (await acRes.json()) as ActiveCallData;
           setActiveCall(data);
-          // If we got a new call attempt, reset disposition state
+          // New active call → reset disposition state
           if (data.has_active_call && data.call_attempt?.id && data.call_attempt.id !== lastDisposedAttemptId.current) {
-            if (!data.call_attempt.ended_at) {
-              setDispositionDone(false);
-              setDispositionNotes("");
-              setCallbackAt("");
-            }
+            setDispositionDone(false);
+            setDispositionNotes("");
+            setCallbackAt("");
+          }
+        }
+        if (wuRes.ok) {
+          const data = (await wuRes.json()) as WrapUpData;
+          setWrapUp(data);
+          // If disposition was already submitted for this attempt, mark done
+          if (data.has_wrap_up && data.call_attempt?.id === lastDisposedAttemptId.current) {
+            // Already disposed — wrap-up will clear on next poll when wrap_up_status != pending
           }
         }
       } catch { /* non-fatal */ }
@@ -303,7 +349,7 @@ export default function DialerPage() {
     void poll();
     const interval = setInterval(poll, 2000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [dialerRunning, activeCall?.has_active_call]);
+  }, [dialerRunning, activeCall?.has_active_call, wrapUp?.has_wrap_up]);
 
   // Arm Agent Session
   const goReady = useCallback(async () => {
@@ -374,10 +420,22 @@ export default function DialerPage() {
     } catch { /* ok */ }
   }, [sessionId, campaignStatus]);
 
-  // Submit disposition using active call context
+  // Hangup active call
+  const doHangup = useCallback(async () => {
+    if (hangupPending) return;
+    setHangupPending(true);
+    try {
+      await fetch("/api/dialer/agents/self/hangup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    } catch { /* ok */ }
+    finally { setHangupPending(false); }
+  }, [hangupPending]);
+
+  // Submit disposition using wrap-up context (or active call fallback)
   const submitDisposition = useCallback(async (outcome: string) => {
     if (dispositionPending) return;
-    const attemptId = activeCall?.call_attempt?.id;
+    // Prefer wrap-up attempt ID, fall back to active call attempt ID
+    const attemptId = wrapUp?.call_attempt?.id || activeCall?.call_attempt?.id;
+    const wrapSessionId = wrapUp?.session_id || activeCall?.session_id || sessionId;
     if (!attemptId) return;
     setDispositionPending(true);
     try {
@@ -385,26 +443,32 @@ export default function DialerPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          agent_disposition: outcome,
+          disposition: outcome,
           notes: dispositionNotes || undefined,
           callback_at: outcome === "callback_requested" && callbackAt ? callbackAt : undefined,
+          session_id: wrapSessionId || undefined,
         }),
       });
       if (res.ok) {
         setDispositionDone(true);
         lastDisposedAttemptId.current = attemptId;
+        setWrapUp(null);
       }
     } catch { /* ok */ }
     finally { setDispositionPending(false); }
-  }, [activeCall, dispositionPending, dispositionNotes, callbackAt]);
+  }, [wrapUp, activeCall, dispositionPending, dispositionNotes, callbackAt, sessionId]);
 
-  // Derived state
-  const ac = activeCall?.has_active_call ? activeCall : null;
-  const lead = ac?.lead;
-  const attempt = ac?.call_attempt;
-  const callEnded = Boolean(attempt?.ended_at);
-  const needsDisposition = Boolean(attempt && callEnded && !attempt.agent_disposition && !dispositionDone);
-  const hasActiveOrWrapCall = Boolean(ac);
+  // Derived 3-state machine
+  const isLiveCall = Boolean(activeCall?.has_active_call);
+  const isWrapUp = Boolean(!isLiveCall && wrapUp?.has_wrap_up && !dispositionDone);
+  const isIdle = !isLiveCall && !isWrapUp;
+
+  // Current context for display
+  const ac = isLiveCall ? activeCall : null;
+  const wu = isWrapUp ? wrapUp : null;
+  const lead = ac?.lead || wu?.lead || null;
+  const attempt = ac?.call_attempt || wu?.call_attempt || null;
+  const campaign = ac?.campaign || wu?.campaign || null;
 
   return (
     <div className="min-h-screen bg-gray-950 p-4 text-white">
@@ -419,10 +483,13 @@ export default function DialerPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {attempt && !callEnded && (
-              <Badge className={`${STATE_COLORS[attempt.state] || "bg-gray-600"} text-white`}>
-                {attempt.state.toUpperCase()}
+            {isLiveCall && attempt && (
+              <Badge className={`${STATE_COLORS[(attempt as ActiveCallData["call_attempt"])?.state ?? ""] || "bg-gray-600"} text-white`}>
+                {((attempt as ActiveCallData["call_attempt"])?.state ?? "").toUpperCase()}
               </Badge>
+            )}
+            {isWrapUp && (
+              <Badge className="bg-yellow-700 text-yellow-100 animate-pulse">WRAP-UP</Badge>
             )}
             {dialerRunning ? (
               <Badge className="bg-green-900 text-green-200">Dialer Running</Badge>
@@ -478,11 +545,11 @@ export default function DialerPage() {
               </Card>
             )}
 
-            {/* ═══ ACTIVE LEAD + ACTIVE CALL ═══ */}
-            {hasActiveOrWrapCall && lead && attempt && (
+            {/* ═══ STATE 1: LIVE CALL ═══ */}
+            {isLiveCall && lead && attempt && (
               <div className="grid gap-4 lg:grid-cols-2">
                 {/* Active Lead */}
-                <Card className={`border-l-4 ${callEnded ? "border-l-gray-500 border-gray-700" : "border-l-green-500 border-green-900/50"} bg-gray-900`}>
+                <Card className="border-l-4 border-l-green-500 border-green-900/50 bg-gray-900">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-base text-gray-100">
                       <User className="h-4 w-4" /> Active Lead
@@ -498,13 +565,10 @@ export default function DialerPage() {
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                       <div><span className="text-gray-400">Phone:</span> <span className="text-white font-mono">{lead.phone || "—"}</span></div>
                       <div><span className="text-gray-400">Lead ID:</span> <span className="text-gray-300">{lead.id?.slice(0, 20) || "—"}</span></div>
-                      <div><span className="text-gray-400">Campaign:</span> <span className="text-gray-300">{ac?.campaign?.name || ac?.campaign?.id || "—"}</span></div>
+                      <div><span className="text-gray-400">Campaign:</span> <span className="text-gray-300">{campaign?.name || campaign?.id || "—"}</span></div>
                       <div><span className="text-gray-400">Status:</span> <span className="text-gray-300">{lead.status || "—"}</span></div>
                       <div><span className="text-gray-400">Attempts:</span> <span className="text-gray-300">{lead.attempt_count ?? 0}{ac?.queue ? ` / ${ac.queue.max_attempts}` : ""}</span></div>
                       <div><span className="text-gray-400">Last Dispo:</span> <span className="text-gray-300">{lead.last_agent_disposition || "—"}</span></div>
-                      {lead.callback_at && (
-                        <div className="col-span-2"><span className="text-gray-400">Callback:</span> <span className="text-blue-300">{formatTime(lead.callback_at)}</span></div>
-                      )}
                     </div>
                     {lead.latest_note && (
                       <div className="mt-1 rounded bg-gray-800 p-2 text-xs text-gray-300">
@@ -514,53 +578,86 @@ export default function DialerPage() {
                   </CardContent>
                 </Card>
 
-                {/* Active Call */}
-                <Card className={`border-l-4 ${callEnded ? "border-l-gray-500 border-gray-700" : "border-l-blue-500 border-blue-900/50"} bg-gray-900`}>
+                {/* Active Call + Hangup */}
+                <Card className="border-l-4 border-l-blue-500 border-blue-900/50 bg-gray-900">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-base text-gray-100">
                       <Phone className="h-4 w-4" /> Active Call
-                      <Badge className={`ml-auto ${STATE_COLORS[attempt.state] || "bg-gray-600"} text-xs text-white`}>
-                        {attempt.state.toUpperCase()}
+                      <Badge className={`ml-auto ${STATE_COLORS[(attempt as ActiveCallData["call_attempt"])?.state ?? ""] || "bg-gray-600"} text-xs text-white`}>
+                        {((attempt as ActiveCallData["call_attempt"])?.state ?? "").toUpperCase()}
                       </Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm">
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                      <div><span className="text-gray-400">Attempt:</span> <span className="text-gray-300 font-mono">{attempt.id?.slice(0, 8)}…</span></div>
-                      <div><span className="text-gray-400">Call ID:</span> <span className="text-gray-300 font-mono">{attempt.call_id?.slice(0, 8)}…</span></div>
                       <div><span className="text-gray-400">Started:</span> <span className="text-gray-300">{formatTime(attempt.started_at)}</span></div>
                       <div><span className="text-gray-400">Answered:</span> <span className="text-gray-300">{formatTime(attempt.answered_at)}</span></div>
                       <div><span className="text-gray-400">Bridged:</span> <span className="text-gray-300">{formatTime(attempt.bridged_at)}</span></div>
-                      <div><span className="text-gray-400">Ended:</span> <span className="text-gray-300">{formatTime(attempt.ended_at)}</span></div>
-                      {attempt.system_outcome && (
-                        <div><span className="text-gray-400">Outcome:</span> <span className="text-gray-300">{attempt.system_outcome}</span></div>
-                      )}
-                      {attempt.agent_disposition && (
-                        <div><span className="text-gray-400">Dispo:</span> <span className="text-gray-300">{attempt.agent_disposition}</span></div>
-                      )}
+                      <div><span className="text-gray-400">Outcome:</span> <span className="text-gray-300">{attempt.system_outcome || "—"}</span></div>
                     </div>
                     {/* Live timers */}
                     <div className="flex gap-4 rounded-md bg-gray-800 p-2 text-center">
                       <div className="flex-1">
                         <div className="text-xs text-gray-400">Duration</div>
-                        <div className="text-lg font-bold text-white">
-                          {callEnded ? formatDuration(attempt.duration_seconds) : <LiveTimer startIso={attempt.started_at} />}
-                        </div>
+                        <div className="text-lg font-bold text-white"><LiveTimer startIso={attempt.started_at} /></div>
                       </div>
                       <div className="flex-1">
                         <div className="text-xs text-gray-400">Talk</div>
                         <div className="text-lg font-bold text-green-400">
-                          {callEnded ? formatDuration(attempt.talk_seconds) : attempt.bridged_at ? <LiveTimer startIso={attempt.bridged_at} /> : "—"}
+                          {attempt.bridged_at ? <LiveTimer startIso={attempt.bridged_at} /> : "—"}
                         </div>
                       </div>
                     </div>
+                    {/* Hangup Button */}
+                    <Button
+                      onClick={doHangup}
+                      disabled={hangupPending}
+                      className="h-10 w-full bg-red-600 font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                    >
+                      <PhoneOff className="mr-2 h-4 w-4" />
+                      {hangupPending ? "Hanging up…" : "Hang Up"}
+                    </Button>
                   </CardContent>
                 </Card>
               </div>
             )}
 
-            {/* Waiting placeholder */}
-            {dialerRunning && !hasActiveOrWrapCall && (
+            {/* ═══ STATE 2: WRAP-UP ═══ */}
+            {isWrapUp && wu && (
+              <Card className="border-l-4 border-l-yellow-500 border-yellow-800/50 bg-gray-900">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base text-yellow-100">
+                    <Clock className="h-4 w-4" /> Wrap-Up — Submit Disposition
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {/* Lead + Call summary */}
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                    <div>
+                      <div className="text-xs text-gray-400">Lead</div>
+                      <div className="font-semibold text-white">
+                        {[wu.lead?.first_name, wu.lead?.last_name].filter(Boolean).join(" ") || "Unknown"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400">Phone</div>
+                      <div className="font-mono text-white">{wu.lead?.phone || "—"}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400">Talk Time</div>
+                      <div className="font-mono text-green-400">{formatDuration(wu.call_attempt?.talk_seconds)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400">Outcome</div>
+                      <div className="text-gray-300">{wu.call_attempt?.system_outcome || "—"}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ═══ STATE 3: IDLE / WAITING ═══ */}
+            {dialerRunning && isIdle && (
               <Card className="border-gray-700 bg-gray-900">
                 <CardContent className="flex items-center justify-center gap-2 py-8 text-sm text-gray-400">
                   <Loader2 className="h-4 w-4 animate-spin" /> Waiting for next lead…
@@ -666,7 +763,7 @@ export default function DialerPage() {
                   <CardContent>
                     {sessionArmed ? (
                       <textarea
-                        placeholder={hasActiveOrWrapCall ? "Notes for this call — saved with disposition…" : "Waiting for active call…"}
+                        placeholder={isLiveCall || isWrapUp ? "Notes for this call — saved with disposition…" : "Waiting for active call…"}
                         value={dispositionNotes}
                         onChange={(e) => setDispositionNotes(e.target.value)}
                         rows={4}
@@ -679,29 +776,33 @@ export default function DialerPage() {
                 </Card>
 
                 {/* Disposition */}
-                <Card className={`border-gray-700 bg-gray-900 ${needsDisposition ? "ring-1 ring-yellow-600" : ""}`}>
+                <Card className={`border-gray-700 bg-gray-900 ${isWrapUp ? "ring-1 ring-yellow-600" : ""}`}>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base text-gray-100">
                       <Phone className="h-4 w-4" /> Disposition
                       {attempt && (
                         <span className="ml-auto text-xs font-normal text-gray-500">
-                          {attempt.id.slice(0, 8)}…
+                          {attempt.id?.slice(0, 8)}…
                         </span>
                       )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {!attempt ? (
+                    {isLiveCall ? (
+                      <div className="flex items-center gap-2 rounded-md border border-blue-800 bg-blue-950/40 p-3 text-sm text-blue-200">
+                        <Phone className="h-4 w-4" /> Call in progress — hang up to disposition
+                      </div>
+                    ) : !attempt && !isWrapUp ? (
                       <p className="text-sm text-gray-500">No active call to disposition.</p>
-                    ) : dispositionDone || attempt.agent_disposition ? (
+                    ) : dispositionDone || attempt?.agent_disposition ? (
                       <div className="flex items-center gap-2 rounded-md border border-green-800 bg-green-950/40 p-3 text-sm text-green-200">
-                        <CheckCircle2 className="h-4 w-4" /> Disposition saved: {attempt.agent_disposition || "submitted"}
+                        <CheckCircle2 className="h-4 w-4" /> Disposition saved: {attempt?.agent_disposition || "submitted"}
                       </div>
                     ) : (
                       <>
-                        {needsDisposition && (
+                        {isWrapUp && (
                           <div className="flex items-center gap-2 rounded-md border border-yellow-800 bg-yellow-950/40 p-2 text-xs text-yellow-200">
-                            <Clock className="h-3 w-3" /> Call ended — submit disposition
+                            <Clock className="h-3 w-3" /> Call ended — submit disposition now
                           </div>
                         )}
                         <div className="grid grid-cols-3 gap-2">
