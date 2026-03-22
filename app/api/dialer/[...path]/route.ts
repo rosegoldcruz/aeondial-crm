@@ -59,7 +59,8 @@ async function proxy(request: Request, method: "GET" | "POST", path: string[]) {
   };
 
   if (method === "POST") {
-    init.body = await request.text();
+    const rawBody = await request.text();
+    init.body = rawBody || "{}";
   }
 
   const res = await fetch(target, init);

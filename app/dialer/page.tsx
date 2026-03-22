@@ -244,6 +244,7 @@ export default function DialerContractPage() {
       const response = await fetch(`/api/dialer/campaigns/${encodeURIComponent(selectedCampaign)}/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: "{}",
       });
       const text = await response.text();
       setCampaignStartResult({ ok: response.ok, status: response.status, text });
