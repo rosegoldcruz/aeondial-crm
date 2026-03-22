@@ -18,10 +18,18 @@ import {
   UserCheck,
   Target,
   Calendar,
+  Building2,
 } from "lucide-react"
-import { SignInButton, SignedIn, SignedOut } from "@clerk/nextjs"
+import {
+  OrganizationSwitcher,
+  SignInButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+  useAuth,
+} from "@clerk/nextjs"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
 import { gsap } from "gsap"
@@ -136,6 +144,57 @@ const navigation = [
   },
 ]
 
+function ClerkShellControls({ compact = false }: { compact?: boolean }) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const { orgId } = useAuth()
+  const previousOrgId = useRef<string | null | undefined>(orgId)
+  const returnPath = pathname && pathname.startsWith("/") ? pathname : "/dialer"
+
+  useEffect(() => {
+    if (previousOrgId.current === orgId) {
+      return
+    }
+
+    previousOrgId.current = orgId
+
+    if (pathname?.startsWith("/dialer")) {
+      router.replace("/dialer")
+      router.refresh()
+    }
+  }, [orgId, pathname, router])
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {!orgId ? (
+        <div
+          className={
+            compact
+              ? "flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-100"
+              : "hidden xl:flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100"
+          }
+        >
+          <Building2 className="h-3.5 w-3.5 text-amber-300" />
+          <span>No active organization selected</span>
+        </div>
+      ) : null}
+
+      <div className="rounded-lg border border-neutral-800 bg-neutral-950/80 px-1.5 py-1 shadow-[0_0_24px_rgba(0,0,0,0.25)] backdrop-blur">
+        <OrganizationSwitcher
+          afterSelectOrganizationUrl={returnPath}
+          afterCreateOrganizationUrl="/dialer"
+          afterLeaveOrganizationUrl="/dialer"
+          hidePersonal
+        />
+      </div>
+
+      <div className="rounded-full border border-neutral-800 bg-neutral-950/80 p-1 shadow-[0_0_24px_rgba(0,0,0,0.25)] backdrop-blur">
+        <UserButton afterSignOutUrl="/" />
+      </div>
+    </div>
+  )
+}
+
 export default function ClientLayout({
   children,
 }: {
@@ -235,8 +294,11 @@ export default function ClientLayout({
     return (
       <ScrollProvider>
         <div className="flex flex-col min-h-screen">
-          <header className="h-14 bg-neutral-900 border-b border-neutral-800 flex items-center justify-center px-4 flex-shrink-0 sticky top-0 z-30">
+          <header className="sticky top-0 z-30 flex min-h-14 items-center justify-between gap-3 border-b border-neutral-800 bg-neutral-900 px-4 py-2 flex-shrink-0">
             <h1 className="text-lg font-bold text-orange-500">AEON DIAL</h1>
+            <SignedIn>
+              <ClerkShellControls compact />
+            </SignedIn>
           </header>
 
           <main className="flex-1 overflow-y-auto bg-neutral-950 pb-24">{children}</main>
@@ -452,6 +514,9 @@ export default function ClientLayout({
           </div>
 
           <div className="flex items-center gap-4">
+            <SignedIn>
+              <ClerkShellControls />
+            </SignedIn>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span className="text-xs text-neutral-400">System Online</span>
