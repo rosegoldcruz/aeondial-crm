@@ -150,6 +150,7 @@ function ClerkShellControls({ compact = false }: { compact?: boolean }) {
   const { orgId } = useAuth()
   const previousOrgId = useRef<string | null | undefined>(orgId)
   const returnPath = pathname && pathname.startsWith("/") ? pathname : "/dialer"
+  const syncUrl = `/org-sync?redirect_url=${encodeURIComponent(returnPath)}`
 
   useEffect(() => {
     if (previousOrgId.current === orgId) {
@@ -181,9 +182,9 @@ function ClerkShellControls({ compact = false }: { compact?: boolean }) {
 
       <div className="rounded-lg border border-neutral-800 bg-neutral-950/80 px-1.5 py-1 shadow-[0_0_24px_rgba(0,0,0,0.25)] backdrop-blur">
         <OrganizationSwitcher
-          afterSelectOrganizationUrl={returnPath}
-          afterCreateOrganizationUrl="/dialer"
-          afterLeaveOrganizationUrl="/dialer"
+          afterSelectOrganizationUrl={syncUrl}
+          afterCreateOrganizationUrl={syncUrl}
+          afterLeaveOrganizationUrl="/org-sync?redirect_url=%2Fdialer"
           hidePersonal
         />
       </div>

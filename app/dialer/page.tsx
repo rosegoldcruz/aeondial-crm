@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CreateOrganization, OrganizationSwitcher, SignedIn } from "@clerk/nextjs";
+import { CreateOrganization, OrganizationList, SignedIn, useAuth } from "@clerk/nextjs";
 import { AlertCircle, CheckCircle2, Loader2, RadioTower } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,7 @@ function formatJson(value: unknown): string {
 }
 
 export default function DialerContractPage() {
+  const { orgId: clientOrgId } = useAuth();
   const [contract, setContract] = useState<DialerContract | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState("");
   const [loading, setLoading] = useState(true);
@@ -147,7 +148,7 @@ export default function DialerContractPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [clientOrgId]);
 
   const softphonePayload =
     contract?.raw_softphone_response.json && typeof contract.raw_softphone_response.json === "object"
@@ -310,16 +311,15 @@ export default function DialerContractPage() {
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0">
                         <div className="mb-2 text-xs uppercase tracking-wide text-amber-300">Select existing org</div>
-                        <OrganizationSwitcher
-                          afterSelectOrganizationUrl="/dialer"
-                          afterCreateOrganizationUrl="/dialer"
-                          afterLeaveOrganizationUrl="/dialer"
+                        <OrganizationList
+                          afterSelectOrganizationUrl={(organization) => `/org-sync?redirect_url=%2Fdialer&selected_org_id=${encodeURIComponent(organization.id)}`}
+                          afterCreateOrganizationUrl="/org-sync?redirect_url=%2Fdialer"
                           hidePersonal
                         />
                       </div>
                       <div className="min-w-0">
                         <div className="mb-2 text-xs uppercase tracking-wide text-amber-300">Or create org</div>
-                        <CreateOrganization afterCreateOrganizationUrl="/dialer" />
+                        <CreateOrganization afterCreateOrganizationUrl="/org-sync?redirect_url=%2Fdialer" />
                       </div>
                     </div>
                   </SignedIn>
