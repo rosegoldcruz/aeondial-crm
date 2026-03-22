@@ -279,9 +279,9 @@ export default function DialerPage() {
     return () => { cancelled = true; clearInterval(interval); };
   }, [dialerRunning, selectedCampaign]);
 
-  // ── Polling: active-call context (every 2s while armed/running) ──
+  // ── Polling: active-call context (every 2s while dialer running or wrapping up) ──
   useEffect(() => {
-    if (!sessionArmed) return;
+    if (!dialerRunning && !activeCall?.has_active_call) return;
     let cancelled = false;
     async function poll() {
       try {
@@ -303,7 +303,7 @@ export default function DialerPage() {
     void poll();
     const interval = setInterval(poll, 2000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [sessionArmed]);
+  }, [dialerRunning, activeCall?.has_active_call]);
 
   // Arm Agent Session
   const goReady = useCallback(async () => {
