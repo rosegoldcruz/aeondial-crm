@@ -202,6 +202,8 @@ export default function ClientLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
+  const [headerDate, setHeaderDate] = useState("")
   const [collapsed, setCollapsed] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
@@ -216,6 +218,18 @@ export default function ClientLayout({
 
   const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register")
   const isHomePage = pathname === "/"
+
+  useEffect(() => {
+    setMounted(true)
+    setHeaderDate(
+      new Intl.DateTimeFormat("en-US", {
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }).format(new Date()),
+    )
+  }, [])
 
   useEffect(() => {
     if (auroraRef.current && animConfig.enableGlow) {
@@ -291,7 +305,9 @@ export default function ClientLayout({
     )
   }
 
-  if (capabilities.isMobile || isMobileViewport) {
+  const showMobileShell = mounted && (capabilities.isMobile || isMobileViewport)
+
+  if (showMobileShell) {
     return (
       <ScrollProvider>
         <div className="flex flex-col min-h-screen">
@@ -504,13 +520,8 @@ export default function ClientLayout({
       <div className="flex-1 flex flex-col min-h-0">
         <header className="h-16 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-4">
-            <div className="text-sm text-neutral-400">
-              {new Date().toLocaleDateString("en-US", {
-                weekday: "short",
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
+            <div className="text-sm text-neutral-400" suppressHydrationWarning>
+              {mounted ? headerDate : ""}
             </div>
           </div>
 
@@ -522,7 +533,7 @@ export default function ClientLayout({
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span className="text-xs text-neutral-400">System Online</span>
             </div>
-            <div className="hidden xl:block text-xs text-neutral-500">
+            <div className="hidden xl:block text-xs text-neutral-500" suppressHydrationWarning>
               GPU: {governor.webGLQuality.toUpperCase()} | FPS: {governor.currentFPS} | Scale: {(governor.animationScale * 100).toFixed(0)}%{governor.isThrottled ? ' (THROTTLED)' : ''}
             </div>
           </div>

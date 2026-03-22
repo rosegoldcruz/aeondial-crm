@@ -15,7 +15,7 @@ const BACKEND_URL =
 const USER_ROLE = sanitizeEnv(process.env.NEXT_PUBLIC_USER_ROLE) || "admin";
 
 async function resolveIdentity() {
-  const { userId, orgId } = await auth();
+  const { userId, orgId, orgSlug } = await auth();
   if (!userId || !orgId) {
     return null;
   }
@@ -31,7 +31,7 @@ async function resolveIdentity() {
   }
   const displayName = fullName || email;
 
-  return { userId, orgId, email, fullName: displayName };
+  return { userId, orgId, orgSlug: orgSlug || null, email, fullName: displayName };
 }
 
 async function proxy(request: Request, method: "GET" | "POST", path: string[]) {
@@ -49,6 +49,7 @@ async function proxy(request: Request, method: "GET" | "POST", path: string[]) {
     headers: {
       "Content-Type": "application/json",
       "x-org-id": identity.orgId,
+      "x-org-slug": identity.orgSlug || identity.orgId,
       "x-role": USER_ROLE,
       "x-user-id": identity.userId,
       "x-user-email": identity.email,

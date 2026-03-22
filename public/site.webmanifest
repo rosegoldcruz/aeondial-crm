@@ -1,0 +1,16 @@
+{
+  "name": "AEON Dial",
+  "short_name": "AEON",
+  "start_url": "/dialer",
+  "display": "standalone",
+  "background_color": "#0a0f1a",
+  "theme_color": "#18181B",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

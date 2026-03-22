@@ -15,7 +15,7 @@ const BACKEND_URL =
 const USER_ROLE = sanitizeEnv(process.env.NEXT_PUBLIC_USER_ROLE) || "admin";
 
 export async function GET() {
-  const { userId: clerkUserId, orgId: clerkOrgId } = await auth();
+  const { userId: clerkUserId, orgId: clerkOrgId, orgSlug: clerkOrgSlug } = await auth();
   const allowDevBypass =
     process.env.NODE_ENV !== "production" &&
     sanitizeEnv(process.env.ALLOW_DEV_DIALER_BYPASS) === "true";
@@ -46,6 +46,7 @@ export async function GET() {
     headers: {
       "Content-Type": "application/json",
       "x-org-id": orgId,
+      "x-org-slug": clerkOrgSlug || orgId,
       "x-role": USER_ROLE,
       "x-user-id": userId,
       "x-user-email": email,
