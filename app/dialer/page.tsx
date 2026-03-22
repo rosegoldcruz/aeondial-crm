@@ -1,153 +1,75 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CreateOrganization, OrganizationSwitcher, SignedIn } from "@clerk/nextjs";
+import { AlertCircle, CheckCircle2, Loader2, RadioTower } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Phone,
-  PhoneOff,
-  PhoneCall,
-  Pause,
-  Play,
-  LogOut,
-  Clock,
-  User,
-  Mic,
-  MicOff,
-  Volume2,
-  AlertCircle,
-  CheckCircle2,
-  RadioTower,
-} from "lucide-react";
-import { BACKEND_URL, toWebSocketUrl } from "@/lib/backend";
-import { useSoftphone, type SoftphoneConfig } from "@/hooks/use-softphone";
-import { useAuth } from "@clerk/nextjs";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+type JsonRecord = Record<string, unknown>;
 
-type AgentState = "OFFLINE" | "READY" | "RESERVED" | "INCALL" | "WRAP" | "PAUSED";
-
-interface AgentSession {
-  session_id: string;
-  agent_id: string;
-  campaign_id: string | null;
-  state: AgentState;
-  last_state_at: string;
-  metadata?: Record<string, unknown> | null;
+interface RawRouteResponse {
+  ok: boolean;
+  status: number;
+  text: string;
+  json: unknown;
 }
 
-interface LiveCall {
-  call_id: string;
-  org_id: string;
-  campaign_id: string | null;
-  contact_id: string | null;
-  lead_id: string | null;
-  assigned_agent: string | null;
-  status: string;
-  started_at: string | null;
-  metadata: Record<string, unknown> | null;
+interface DialerContract {
+  checked_at: string;
+  identity: {
+    userId: string | null;
+    orgId: string | null;
+    email: string | null;
+    displayName: string | null;
+  };
+  backend_user_mapping: {
+    exact_user_org_row: JsonRecord | null;
+    email_org_row: JsonRecord | null;
+    has_exact_user_org_row: boolean;
+    endpoint_metadata: JsonRecord | null;
+  };
+  raw_campaigns_response: RawRouteResponse;
+  raw_softphone_response: RawRouteResponse;
+  registration: {
+    endpoint: string | null;
+    status: string | null;
+    source: string | null;
+    reason: string | null;
+  };
+  campaign_access: {
+    org_has_campaigns: boolean;
+    org_campaign_count: number;
+    org_campaigns: JsonRecord[];
+    user_allowed_to_see_campaigns: boolean;
+    rendered_campaign_count: number;
+  };
+  diagnosis: {
+    unauthorized: boolean;
+    unauthorized_reasons: string[];
+    browser_softphone_reason: string;
+    active_org_required: boolean;
+    suggested_next_step: string;
+  };
 }
 
-interface Campaign {
-  campaign_id: string;
-  name?: string | null;
-  status?: string | null;
+interface ReadyResult {
+  ok: boolean;
+  status: number;
+  text: string;
 }
 
 interface CampaignOption {
-  value: string;
+  campaign_id: string;
   label: string;
 }
 
-interface WsEvent {
-  type: string;
-  payload?: Record<string, unknown>;
-}
-
-interface HumanReadyPayload {
-  call_id: string;
-  agent_id?: string;
-  session_id?: string;
-  stage?: string;
-  lead_name?: string | null;
-  contact_name?: string | null;
-  lead_phone?: string | null;
-  phone?: string | null;
-  metadata?: Record<string, unknown>;
-}
-
-type DispositionOutcome =
-  | "SALE"
-  | "NOT_INTERESTED"
-  | "CALLBACK"
-  | "BUSY"
-  | "NO_ANSWER"
-  | "WRONG_NUMBER"
-  | "DNC"
-  | "OTHER";
-
-const OUTCOME_LABELS: Record<DispositionOutcome, string> = {
-  SALE: "Sale / Conversion",
-  NOT_INTERESTED: "Not Interested",
-  CALLBACK: "Schedule Callback",
-  BUSY: "Busy",
-  NO_ANSWER: "No Answer",
-  WRONG_NUMBER: "Wrong Number",
-  DNC: "Do Not Call",
-  OTHER: "Other",
-};
-
-// ── Badge colours ──────────────────────────────────────────────────────────────
-
-function stateBadge(state: AgentState): string {
-  switch (state) {
-    case "READY":    return "bg-green-500 text-white";
-    case "RESERVED": return "bg-yellow-500 text-white";
-    case "INCALL":   return "bg-blue-600 text-white";
-    case "WRAP":     return "bg-orange-500 text-white";
-    case "PAUSED":   return "bg-gray-500 text-white";
-    default:         return "bg-zinc-700 text-white";
-  }
-}
-
-function normalizeCampaigns(payload: Campaign[]): Campaign[] {
-  return [...payload]
-    .map((campaign) => ({
-      campaign_id: typeof campaign.campaign_id === "string" ? campaign.campaign_id.trim() : "",
-      name: typeof campaign.name === "string" ? campaign.name.trim() : null,
-      status: typeof campaign.status === "string" ? campaign.status.trim().toLowerCase() : null,
-    }))
-    .filter((campaign) => campaign.campaign_id.length > 0)
-    .sort((a, b) => {
-      const aActive = a.status === "active";
-      const bActive = b.status === "active";
-      if (aActive !== bActive) return aActive ? -1 : 1;
-      const aLabel = a.name || a.campaign_id;
-      const bLabel = b.name || b.campaign_id;
-      return aLabel.localeCompare(bLabel);
-    });
-}
-
-function toCampaignOptions(payload: Campaign[]): CampaignOption[] {
-  return payload.map((campaign) => ({
-    value: campaign.campaign_id,
-    label: campaign.name || campaign.campaign_id,
-  }));
-}
-
-function extractCampaigns(raw: unknown): Campaign[] {
+function extractCampaigns(raw: unknown): JsonRecord[] {
   if (Array.isArray(raw)) {
-    return raw as Campaign[];
+    return raw.filter((item): item is JsonRecord => Boolean(item) && typeof item === "object");
   }
+
   if (raw && typeof raw === "object") {
     const record = raw as {
       campaigns?: unknown[];
@@ -155,944 +77,403 @@ function extractCampaigns(raw: unknown): Campaign[] {
       items?: unknown[];
       results?: unknown[];
     };
-    if (Array.isArray(record.campaigns)) return record.campaigns as Campaign[];
-    if (Array.isArray(record.data)) return record.data as Campaign[];
-    if (Array.isArray(record.items)) return record.items as Campaign[];
-    if (Array.isArray(record.results)) return record.results as Campaign[];
+
+    if (Array.isArray(record.campaigns)) return extractCampaigns(record.campaigns);
+    if (Array.isArray(record.data)) return extractCampaigns(record.data);
+    if (Array.isArray(record.items)) return extractCampaigns(record.items);
+    if (Array.isArray(record.results)) return extractCampaigns(record.results);
   }
-  throw new Error("Campaign response was not an array");
+
+  return [];
 }
 
-function findLiveCallForAgent(
-  calls: LiveCall[],
-  agentId: string,
-  sessionId?: string | null,
-): LiveCall | null {
-  const match = calls.find((call) => {
-    const metadata = (call.metadata || {}) as Record<string, unknown>;
-    return (
-      call.assigned_agent === agentId ||
-      metadata.agent_id === agentId ||
-      (sessionId ? metadata.session_id === sessionId : false)
-    );
-  });
-
-  return match ?? null;
+function formatJson(value: unknown): string {
+  if (value == null) return "null";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
-// ── Call timer hook ────────────────────────────────────────────────────────────
-
-function useCallTimer(active: boolean, startedAt: string | null): string {
-  const [elapsed, setElapsed] = useState(0);
+export default function DialerContractPage() {
+  const [contract, setContract] = useState<DialerContract | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [readyPending, setReadyPending] = useState(false);
+  const [readyResult, setReadyResult] = useState<ReadyResult | null>(null);
 
   useEffect(() => {
-    if (!active || !startedAt) { setElapsed(0); return; }
-    const start = Date.parse(startedAt);
-    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [active, startedAt]);
+    let cancelled = false;
 
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-  return h > 0
-    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-    : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
+    async function load() {
+      setLoading(true);
+      setLoadError(null);
 
-// ── Main component ─────────────────────────────────────────────────────────────
-
-export default function DialerAgentPanel() {
-  const { userId: clerkUserId } = useAuth();
-  const [session, setSession] = useState<AgentSession | null>(null);
-  const [callInfo, setCallInfo] = useState<LiveCall | null>(null);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [selectedCampaign, setSelectedCampaign] = useState<string>("");
-  const [muted, setMuted] = useState(false);
-  const [showDispModal, setShowDispModal] = useState(false);
-  const [dispOutcome, setDispOutcome] = useState<DispositionOutcome>("NOT_INTERESTED");
-  const [dispNotes, setDispNotes] = useState("");
-  const [dispCallbackDate, setDispCallbackDate] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const [softphoneConfig, setSoftphoneConfig] = useState<SoftphoneConfig | null>(null);
-  const [wrapUntil, setWrapUntil] = useState<string | null>(null);
-  const [humanReady, setHumanReady] = useState<HumanReadyPayload | null>(null);
-
-  const wsRef = useRef<WebSocket | null>(null);
-  const sessionDebugRef = useRef<string | null>(null);
-  const campaignsDebugRef = useRef<string | null>(null);
-  const uiStateDebugRef = useRef<string | null>(null);
-  const campaignFetchDebugLoggedRef = useRef(false);
-  const campaignRenderDebugLoggedRef = useRef(false);
-  const campaignStateSetDebugRef = useRef<string | null>(null);
-  const softphone = useSoftphone(softphoneConfig);
-  const agentId = softphoneConfig?.agent_id || clerkUserId || "";
-
-  const logSessionPayload = useCallback((nextSession: AgentSession | null) => {
-    const serialized = JSON.stringify(nextSession);
-    if (sessionDebugRef.current === serialized) return;
-    sessionDebugRef.current = serialized;
-    console.debug("[dialer] session payload received", nextSession);
-  }, []);
-
-  const logCampaignsPayload = useCallback((nextCampaigns: Campaign[]) => {
-    const serialized = JSON.stringify(nextCampaigns);
-    if (campaignsDebugRef.current === serialized) return;
-    campaignsDebugRef.current = serialized;
-    console.debug("[dialer] campaigns payload received", nextCampaigns);
-  }, []);
-
-  const logCampaignStateSet = useCallback((source: string, nextCampaigns: Campaign[]) => {
-    const payload = {
-      source,
-      nextCampaigns,
-      renderedOptions: toCampaignOptions(nextCampaigns),
-    };
-    const serialized = JSON.stringify(payload);
-    if (campaignStateSetDebugRef.current === serialized) return;
-    campaignStateSetDebugRef.current = serialized;
-    console.debug("[dialer] campaigns state set", payload);
-  }, []);
-
-  const logUiState = useCallback((nextState: Record<string, unknown>) => {
-    const serialized = JSON.stringify(nextState);
-    if (uiStateDebugRef.current === serialized) return;
-    uiStateDebugRef.current = serialized;
-    console.debug("[dialer] normalized UI state derived from backend", nextState);
-  }, []);
-
-  const postLocal = useCallback(async <T,>(path: string, body: Record<string, unknown>): Promise<T> => {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(errorText || `Request failed: ${res.status}`);
-    }
-    return (await res.json()) as T;
-  }, []);
-
-  const callTimer = useCallTimer(
-    session?.state === "INCALL",
-    callInfo?.started_at ?? null,
-  );
-
-  const [wrapCountdown, setWrapCountdown] = useState(0);
-
-  useEffect(() => {
-    if (!wrapUntil) {
-      setWrapCountdown(0);
-      return;
-    }
-
-    const tick = () => {
-      const remaining = Math.max(0, Math.ceil((Date.parse(wrapUntil) - Date.now()) / 1000));
-      setWrapCountdown(remaining);
-    };
-
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [wrapUntil]);
-
-  // ── Load campaigns ──────────────────────────────────────────────────────────
-
-  const refreshCampaigns = useCallback(async () => {
-    const requestUrl = `/api/dialer/campaigns`;
-    try {
-      const response = await fetch(requestUrl, {
-        cache: "no-store",
-      });
-      const rawBody = await response.text();
-
-      if (!campaignFetchDebugLoggedRef.current) {
-        campaignFetchDebugLoggedRef.current = true;
-        console.debug("[dialer] campaign fetch debug", {
-          backendUrl: BACKEND_URL,
-          orgId: softphoneConfig?.org_id ?? null,
-          envOrgId: null,
-          userId: clerkUserId ?? null,
-          agentId,
-          requestUrl,
-          responseStatus: response.status,
-          rawResponseBody: rawBody,
+      try {
+        const response = await fetch("/api/dialer/contract", {
+          method: "GET",
+          cache: "no-store",
         });
-      }
+        const body = (await response.json()) as DialerContract;
 
-      if (!response.ok) {
-        throw new Error(rawBody || `Campaign request failed: ${response.status}`);
-      }
+        if (!response.ok) {
+          throw new Error(formatJson(body));
+        }
 
-      const parsedBody = rawBody ? JSON.parse(rawBody) : [];
-      const payload = extractCampaigns(parsedBody);
-      const normalized = normalizeCampaigns(payload);
-      const campaignOptions = toCampaignOptions(normalized);
-      logCampaignStateSet("refreshCampaigns", normalized);
-      setCampaigns(normalized);
-      logCampaignsPayload(normalized);
-      setSelectedCampaign((current) => {
-        if (current && normalized.some((campaign) => campaign.campaign_id === current)) {
-          return current;
+        if (!cancelled) {
+          setContract(body);
+          const campaigns = extractCampaigns(body.raw_campaigns_response.json);
+          if (campaigns.length === 1) {
+            const onlyCampaignId = campaigns[0]?.campaign_id;
+            if (typeof onlyCampaignId === "string") {
+              setSelectedCampaign(onlyCampaignId);
+            }
+          }
         }
-        if (session?.campaign_id && normalized.some((campaign) => campaign.campaign_id === session.campaign_id)) {
-          return session.campaign_id;
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(error instanceof Error ? error.message : "Failed to load dialer contract");
         }
-        if (normalized.length === 1) {
-          return normalized[0].campaign_id;
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
-        return current;
-      });
-
-      if (!campaignRenderDebugLoggedRef.current) {
-        campaignRenderDebugLoggedRef.current = true;
-        console.debug("[dialer] campaign render mapping", {
-          rawCampaignsResponse: parsedBody,
-          campaignOptions,
-          selectedCampaign,
-          renderedOptions: campaignOptions,
-        });
       }
-    } catch (campaignError) {
-      console.debug("[dialer] campaign fetch failed", {
-        message: campaignError instanceof Error ? campaignError.message : "Unknown campaign fetch failure",
-        requestUrl,
-      });
     }
-  }, [agentId, clerkUserId, logCampaignStateSet, logCampaignsPayload, selectedCampaign, session?.campaign_id, softphoneConfig?.org_id]);
 
-  useEffect(() => {
-    void refreshCampaigns();
-  }, [refreshCampaigns]);
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  useEffect(() => {
-    fetch("/api/dialer/agents/self/softphone", { cache: "no-store" })
-      .then(async (res) => {
-        const body = (await res.json()) as SoftphoneConfig | { error?: string };
-        if (!res.ok) {
-          throw new Error((body as { error?: string }).error || "Failed to load softphone config");
+  const softphonePayload =
+    contract?.raw_softphone_response.json && typeof contract.raw_softphone_response.json === "object"
+      ? (contract.raw_softphone_response.json as JsonRecord)
+      : null;
+
+  const campaignOptions = useMemo<CampaignOption[]>(() => {
+    const campaigns = extractCampaigns(contract?.raw_campaigns_response.json);
+    return campaigns
+      .map((campaign) => {
+        const campaignId = campaign.campaign_id;
+        if (typeof campaignId !== "string" || !campaignId.trim()) {
+          return null;
         }
-        setSoftphoneConfig(body as SoftphoneConfig);
+
+        const name = typeof campaign.name === "string" && campaign.name.trim()
+          ? campaign.name.trim()
+          : campaignId;
+
+        return {
+          campaign_id: campaignId,
+          label: name,
+        };
       })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Failed to load softphone config");
-      });
-  }, []);
+      .filter((campaign): campaign is CampaignOption => Boolean(campaign));
+  }, [contract]);
 
-  // ── Restore session on mount ────────────────────────────────────────────────
-
-  const refreshDialerState = useCallback(async () => {
-    try {
-      const [sessionRes, callsRes] = await Promise.all([
-        fetch(`/api/dialer/agents/${encodeURIComponent(agentId)}/session`, { cache: "no-store" }),
-        fetch(`/api/dialer/calls/live?limit=100`, { cache: "no-store" }),
-      ]);
-      if (!sessionRes.ok || !callsRes.ok) {
-        throw new Error("Failed to load dialer state");
-      }
-      const sessionJson = (await sessionRes.json()) as { session: AgentSession };
-      const nextSession = sessionJson.session;
-      const liveCalls = (await callsRes.json()) as LiveCall[];
-
-      setSession(nextSession);
-      logSessionPayload(nextSession);
-      if (nextSession.campaign_id) {
-        setSelectedCampaign(nextSession.campaign_id);
-      }
-
-      const nextCall = findLiveCallForAgent(liveCalls, agentId, nextSession.session_id);
-      setCallInfo(nextCall);
-      if (!nextCall && nextSession.state !== "INCALL") {
-        setHumanReady(null);
-      }
-    } catch {
-      setSession(null);
-      setCallInfo(null);
-    }
-  }, [agentId, logSessionPayload]);
-
-  useEffect(() => {
-    void refreshDialerState();
-    const intervalId = window.setInterval(() => {
-      void refreshDialerState();
-    }, 5000);
-    return () => window.clearInterval(intervalId);
-  }, [refreshDialerState]);
-
-  // ── WebSocket subscription ──────────────────────────────────────────────────
-
-  const connectWs = useCallback(() => {
-    const wsOrgId = softphoneConfig?.org_id;
-    if (!wsOrgId) {
-      return { close: () => undefined } as unknown as WebSocket;
-    }
-    const wsUrl = `${toWebSocketUrl(BACKEND_URL)}/ws?org_id=${encodeURIComponent(wsOrgId)}`;
-    const ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => setStatusMsg("Live events connected");
-    ws.onclose = () => setTimeout(connectWs, 3000); // auto-reconnect
-    ws.onerror = () => ws.close();
-
-    ws.onmessage = (ev) => {
-      let evt: WsEvent;
-      try { evt = JSON.parse(ev.data as string); } catch { return; }
-
-      if (evt.type === "agent.state") {
-        const payload = evt.payload ?? {};
-        if (payload.agent_id === agentId) {
-          void refreshDialerState();
-
-          // Show disposition modal on WRAP
-          if (payload.to_state === "WRAP") {
-            setShowDispModal(true);
-            setStatusMsg("Call ended — wrap up and disposition");
-          }
-
-          if (payload.to_state === "READY") {
-            setWrapUntil(null);
-            setHumanReady(null);
-            setCallInfo(null);
-            setShowDispModal(false);
-          }
-        }
-      }
-
-      if (evt.type === "call.human_ready") {
-        const payload = evt.payload ?? {};
-        if (payload.agent_id === agentId) {
-          setHumanReady({
-            call_id: String(payload.call_id ?? ""),
-            agent_id: typeof payload.agent_id === "string" ? payload.agent_id : undefined,
-            session_id: typeof payload.session_id === "string" ? payload.session_id : undefined,
-            stage: typeof payload.stage === "string" ? payload.stage : undefined,
-            lead_name: typeof payload.lead_name === "string" ? payload.lead_name : null,
-            contact_name: typeof payload.contact_name === "string" ? payload.contact_name : null,
-            lead_phone: typeof payload.lead_phone === "string" ? payload.lead_phone : null,
-            phone: typeof payload.phone === "string" ? payload.phone : null,
-            metadata: (payload.metadata || {}) as Record<string, unknown>,
-          });
-          setStatusMsg(
-            payload.stage === "beeping"
-              ? "Human detected — beeping agent"
-              : "Human detected — alerting agent",
-          );
-          void refreshDialerState();
-        }
-      }
-
-      if (evt.type === "call.bridged") {
-        setHumanReady(null);
-        setWrapUntil(null);
-        setStatusMsg("Live call connected");
-        void refreshDialerState();
-      }
-
-      if (evt.type === "call.wrap") {
-        const payload = evt.payload ?? {};
-        if (payload.agent_id === agentId || session?.state === "INCALL") {
-          if (typeof payload.wrap_until === "string") {
-            setWrapUntil(payload.wrap_until);
-          }
-          setShowDispModal(true);
-          setStatusMsg("Wrap time started");
-          void refreshDialerState();
-        }
-      }
-
-      if (evt.type === "call.event") {
-        const payload = evt.payload ?? {};
-        const action = payload.action as string | undefined;
-        if ((action === "call.ended" || action === "ended") && callInfo?.call_id === (payload.call_id as string)) {
-          setStatusMsg("Call ended — wrap time");
-          void refreshDialerState();
-        }
-      }
-
-      if (
-        evt.type === "call.amd_result" ||
-        evt.type === "queue.lead_dialing" ||
-        evt.type === "queue.lead_answered"
-      ) {
-        void refreshDialerState();
-      }
-    };
-
-    wsRef.current = ws;
-    return ws;
-  }, [agentId, callInfo?.call_id, refreshDialerState, session?.state, softphoneConfig?.org_id]);
-
-  useEffect(() => {
-    const ws = connectWs();
-    return () => ws.close();
-  }, [connectWs]);
-
-  // ── Agent actions ───────────────────────────────────────────────────────────
+  const agentId =
+    typeof softphonePayload?.agent_id === "string"
+      ? softphonePayload.agent_id
+      : contract?.identity.userId || "";
+  const readyEnabled =
+    Boolean(selectedCampaign) &&
+    Boolean(contract?.registration.endpoint) &&
+    contract?.registration.status === "registered" &&
+    contract?.registration.source === "ari";
 
   async function goReady() {
-    if (!selectedCampaign) { setError("Select a campaign first"); return; }
-    if (!softphoneConfig?.endpoint) { setError("Softphone endpoint is not configured"); return; }
-    const backendRegistrationVerified =
-      softphoneConfig?.registration_source === "ari" && softphoneConfig?.registration_status === "registered";
-    const registrationConfirmed = softphone.isRegistered || backendRegistrationVerified;
-    if (!registrationConfirmed) {
-      setError("SIP registration is not confirmed. Register the phone before going READY.");
+    if (!contract || !readyEnabled) {
       return;
     }
-    setError(null);
+
+    setReadyPending(true);
+    setReadyResult(null);
+
     try {
-      const res = await postLocal<{ session: AgentSession }>("/api/dialer/agents/session", {
-        agent_id: agentId,
-        campaign_id: selectedCampaign,
-        endpoint: softphoneConfig.endpoint,
-        softphone: softphoneConfig,
+      const response = await fetch("/api/dialer/agents/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          agent_id: agentId,
+          campaign_id: selectedCampaign,
+          endpoint: contract.registration.endpoint,
+          softphone: softphonePayload,
+        }),
       });
-      setSession(res.session);
-      setStatusMsg("You are now READY to receive calls");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to go ready");
-    }
-  }
+      const text = await response.text();
 
-  async function transitionState(state: AgentState, reason?: string) {
-    if (!session) return;
-    setError(null);
-    try {
-      const res = await postLocal<{ session: AgentSession }>(
-        `/api/dialer/agents/${session.session_id}/state`,
-        { state, reason },
-      );
-      setSession(res.session);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "State change failed");
-    }
-  }
-
-  async function endCall() {
-    if (!callInfo) return;
-    setError(null);
-    try {
-      await postLocal("/api/telephony/calls/end", {
-        agent_id: agentId,
-        call_id: callInfo.call_id,
+      setReadyResult({
+        ok: response.ok,
+        status: response.status,
+        text,
       });
-      // INCALL → WRAP will come via WebSocket
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "End call failed");
-    }
-  }
-
-  async function submitDisposition() {
-    if (!session || !callInfo) return;
-    setError(null);
-    try {
-      await postLocal(`/api/dialer/calls/${callInfo.call_id}/disposition`, {
-        outcome: dispOutcome,
-        notes: dispNotes || undefined,
-        callback_at: dispOutcome === "CALLBACK" && dispCallbackDate ? dispCallbackDate : undefined,
-        session_id: session.session_id,
+    } catch (error) {
+      setReadyResult({
+        ok: false,
+        status: 0,
+        text: error instanceof Error ? error.message : "READY request failed",
       });
-      setShowDispModal(false);
-      setDispNotes("");
-      setDispCallbackDate("");
-      setCallInfo(null);
-      setWrapUntil(null);
-      setHumanReady(null);
-      setStatusMsg("Disposition saved — returning to READY");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Disposition failed");
+    } finally {
+      setReadyPending(false);
     }
   }
-
-  async function toggleMute() {
-    // Mute is managed locally (media control handled by WebRTC/SIP stack on client)
-    setMuted((m) => !m);
-  }
-
-  // ── Render ──────────────────────────────────────────────────────────────────
-
-  const agentState: AgentState = session?.state ?? "OFFLINE";
-  const isOffline = agentState === "OFFLINE";
-  const isReady = agentState === "READY";
-  const isReserved = agentState === "RESERVED";
-  const isInCall = agentState === "INCALL";
-  const isWrap = agentState === "WRAP";
-  const isPaused = agentState === "PAUSED";
-  const browserSoftphoneConfigured = Boolean(
-    softphoneConfig?.sip_uri &&
-    softphoneConfig?.authorization_username &&
-    softphoneConfig?.password &&
-    softphoneConfig?.ws_server,
-  );
-  const backendRegistrationVerified =
-    softphoneConfig?.registration_source === "ari" && softphoneConfig?.registration_status === "registered";
-  const registrationUnknown =
-    softphoneConfig?.registration_status === "unknown" ||
-    softphoneConfig?.registration_source !== "ari";
-  const registrationConfirmed = softphone.isRegistered || backendRegistrationVerified;
-  const softphoneStatusLabel =
-    registrationConfirmed
-      ? "Registered"
-      : softphone.status === "connecting"
-      ? "Registering..."
-      : softphone.status === "error"
-        ? "Softphone Error"
-        : browserSoftphoneConfigured
-          ? "Softphone Idle"
-          : "Registration Unverified";
-  const externalPhoneMode = Boolean(softphoneConfig?.endpoint) && !browserSoftphoneConfigured;
-  const uiPhoneTypeLabel =
-    externalPhoneMode ? "External SIP Phone" : "Browser Softphone";
-  const connectionStateLabel = registrationConfirmed ? "Connected" : "Not Connected";
-  const autoNextEnabled = Boolean(session) && ["READY", "RESERVED", "WRAP"].includes(agentState);
-  const campaignOptions = toCampaignOptions(campaigns);
-  const renderedSelectOptions = [
-    { value: "", label: "Choose a campaign to go READY", disabled: true },
-    ...campaignOptions.map((campaign) => ({ ...campaign, disabled: false })),
-  ];
-  const hasSelectedCampaign = selectedCampaign.trim().length > 0;
-  const softphoneReadyForDialing = registrationConfirmed;
-  const canGoReady = hasSelectedCampaign && softphoneReadyForDialing;
-  const sessionMetadata = (session?.metadata || {}) as Record<string, unknown>;
-  const displayedEndpoint =
-    (typeof sessionMetadata.endpoint === "string" && sessionMetadata.endpoint) ||
-    (typeof softphoneConfig?.endpoint === "string" && softphoneConfig.endpoint) ||
-    null;
-
-  const lead = callInfo?.metadata as Record<string, unknown> | null;
-  const leadName =
-    humanReady?.lead_name ??
-    humanReady?.contact_name ??
-    lead?.lead_name ??
-    lead?.contact_name ??
-    "Unknown Lead";
-  const leadPhone =
-    humanReady?.lead_phone ??
-    humanReady?.phone ??
-    lead?.phone ??
-    (typeof callInfo?.metadata?.endpoint === "string" ? callInfo.metadata.endpoint : "—");
-
-  const deviceBadgeLabel = registrationConfirmed
-    ? "Connected"
-    : displayedEndpoint
-      ? "Configured (Unverified)"
-      : softphoneStatusLabel;
-  const deviceBadgeClassName = registrationConfirmed
-    ? "bg-green-600 text-white"
-    : displayedEndpoint
-      ? "bg-yellow-700 text-white"
-      : "bg-gray-700 text-white";
-  const deviceStatusCopy = registrationConfirmed
-    ? "SIP registration is confirmed"
-    : displayedEndpoint
-      ? registrationUnknown
-        ? "Device may be online locally, but backend registration is not confirmed"
-        : "Endpoint exists, but registration is not confirmed"
-      : "No active device is configured";
-
-  useEffect(() => {
-    logUiState({
-      agentId,
-      campaigns,
-      campaignOptions,
-      externalPhoneMode,
-      selectedCampaign,
-      sessionState: session?.state ?? "OFFLINE",
-      sessionId: session?.session_id ?? null,
-      callId: callInfo?.call_id ?? null,
-      callStatus: callInfo?.status ?? null,
-      displayedEndpoint,
-      campaignCount: campaigns.length,
-    });
-  }, [
-    agentId,
-    campaignOptions,
-    campaigns,
-    callInfo?.call_id,
-    callInfo?.status,
-    campaigns.length,
-    displayedEndpoint,
-    externalPhoneMode,
-    logUiState,
-    selectedCampaign,
-    session?.session_id,
-    session?.state,
-  ]);
-
-  useEffect(() => {
-    if (!campaignRenderDebugLoggedRef.current && campaignOptions.length === 0) {
-      return;
-    }
-    console.debug("[dialer] campaign render state", {
-      campaignOptionsLength: campaignOptions.length,
-      campaigns,
-      optionNodes: renderedSelectOptions,
-      renderedOptions: campaignOptions,
-      selectedCampaign,
-    });
-    campaignRenderDebugLoggedRef.current = true;
-  }, [campaignOptions, campaigns, renderedSelectOptions, selectedCampaign]);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-4 flex flex-col items-center">
-      <div className="w-full max-w-lg space-y-4">
-
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gray-950 p-4 text-white">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <RadioTower className="h-5 w-5 text-blue-400" />
-            <h1 className="text-xl font-bold">Agent Dial Panel</h1>
+            <div>
+              <h1 className="text-xl font-semibold">Real User Dialer Contract</h1>
+              <p className="text-sm text-gray-400">This page renders only authenticated server truth.</p>
+            </div>
           </div>
-          <Badge className={`text-sm px-3 py-1 ${stateBadge(agentState)}`}>
-            {agentState}
+          <Badge className="bg-gray-800 text-gray-200">
+            {contract?.checked_at ? new Date(contract.checked_at).toLocaleString() : "Loading"}
           </Badge>
         </div>
 
-        {/* ── Status / Error messages ── */}
-        {error && (
-          <div className="flex items-center gap-2 bg-red-900/40 border border-red-700 rounded-lg p-3 text-sm text-red-300">
-            <AlertCircle className="h-4 w-4 shrink-0" />{error}
-          </div>
-        )}
-        {statusMsg && !error && (
-          <div className="flex items-center gap-2 bg-blue-900/30 border border-blue-700 rounded-lg p-3 text-sm text-blue-300">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />{statusMsg}
-          </div>
-        )}
+        {loading ? (
+          <Card className="border-gray-700 bg-gray-900">
+            <CardContent className="flex items-center gap-2 py-6 text-sm text-gray-300">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading authenticated dialer contract…
+            </CardContent>
+          </Card>
+        ) : null}
 
-        <Card className="bg-gray-900 border-gray-700">
-          <CardContent className="pt-4 pb-4 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm text-gray-400">Phone</div>
-              <div className="text-sm text-white font-medium">{uiPhoneTypeLabel}</div>
-              <div className="text-xs text-gray-300 mt-1">Connection: {connectionStateLabel}</div>
-              {displayedEndpoint ? (
-                <div className="text-xs text-gray-200 font-mono">Endpoint {displayedEndpoint}</div>
-              ) : (
-                <div className="text-xs text-red-400">No endpoint configured in agent softphone metadata</div>
-              )}
-              {displayedEndpoint ? (
-                <div className="text-xs text-gray-400 mt-1">{deviceStatusCopy}</div>
-              ) : null}
-              {!externalPhoneMode && softphone.error ? (
-                <div className="text-xs text-red-400 mt-1">{softphone.error}</div>
-              ) : null}
+        {loadError ? (
+          <Card className="border-red-800 bg-red-950/40">
+            <CardContent className="flex items-center gap-2 py-4 text-sm text-red-200">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {loadError}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {contract ? (
+          <>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="border-gray-700 bg-gray-900">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Authenticated Identity</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div><span className="text-gray-400">userId:</span> {contract.identity.userId || "null"}</div>
+                  <div><span className="text-gray-400">orgId:</span> {contract.identity.orgId || "null"}</div>
+                  <div><span className="text-gray-400">email:</span> {contract.identity.email || "null"}</div>
+                  <div><span className="text-gray-400">displayName:</span> {contract.identity.displayName || "null"}</div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-gray-700 bg-gray-900">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Backend User Mapping</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div>
+                    <span className="text-gray-400">exact user/org row:</span>{" "}
+                    {contract.backend_user_mapping.has_exact_user_org_row ? "yes" : "no"}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">endpoint metadata:</span>{" "}
+                    {contract.backend_user_mapping.endpoint_metadata ? "present" : "missing"}
+                  </div>
+                  <pre className="max-h-48 overflow-auto rounded-md bg-gray-950 p-3 text-xs text-gray-200">
+                    {formatJson(
+                      contract.backend_user_mapping.exact_user_org_row ||
+                        contract.backend_user_mapping.email_org_row,
+                    )}
+                  </pre>
+                </CardContent>
+              </Card>
             </div>
-            <Badge className={deviceBadgeClassName}>
-              {deviceBadgeLabel}
-            </Badge>
-          </CardContent>
-        </Card>
 
-        {/* ── Campaign selector (only when offline) ── */}
-        {isOffline && (
-          <Card className="bg-gray-900 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-base text-gray-200">Campaign</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <select
-                  value={selectedCampaign}
-                  onChange={(event) => setSelectedCampaign(event.target.value)}
-                  className="w-full h-11 rounded-md border border-gray-600 bg-gray-800 px-3 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-                >
-                  {renderedSelectOptions.map((campaign) => (
-                    <option
-                      key={campaign.value || "__placeholder__"}
-                      value={campaign.value}
-                      disabled={campaign.disabled}
+            {contract.diagnosis.active_org_required ? (
+              <Card className="border-amber-800 bg-amber-950/30">
+                <CardHeader>
+                  <CardTitle className="text-base text-amber-100">Active Org Required</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm text-amber-50">
+                  <p>
+                    Clerk has a signed-in user, but no active organization is attached to this session. The dialer
+                    API routes require both `userId` and `orgId`, so the real path stops here until an org is active.
+                  </p>
+                  <SignedIn>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="mb-2 text-xs uppercase tracking-wide text-amber-300">Select existing org</div>
+                        <OrganizationSwitcher
+                          afterSelectOrganizationUrl="/dialer"
+                          afterCreateOrganizationUrl="/dialer"
+                          afterLeaveOrganizationUrl="/dialer"
+                          hidePersonal
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="mb-2 text-xs uppercase tracking-wide text-amber-300">Or create org</div>
+                        <CreateOrganization afterCreateOrganizationUrl="/dialer" />
+                      </div>
+                    </div>
+                  </SignedIn>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+              <Card className="border-gray-700 bg-gray-900">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Dialer Ready Gate</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-2 text-sm">
+                    <div><span className="text-gray-400">endpoint:</span> {contract.registration.endpoint || "null"}</div>
+                    <div><span className="text-gray-400">registration:</span> {contract.registration.status || "null"}</div>
+                    <div><span className="text-gray-400">source:</span> {contract.registration.source || "null"}</div>
+                    <div><span className="text-gray-400">reason:</span> {contract.registration.reason || "null"}</div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm text-gray-300" htmlFor="campaign">
+                      Campaign
+                    </label>
+                    <select
+                      id="campaign"
+                      value={selectedCampaign}
+                      onChange={(event) => setSelectedCampaign(event.target.value)}
+                      className="h-11 w-full rounded-md border border-gray-700 bg-gray-950 px-3 text-sm text-white outline-none focus:border-blue-500"
                     >
-                      {campaign.label}
-                    </option>
-                  ))}
-                </select>
-                {campaigns.length === 0 ? (
-                  <p className="text-xs text-red-300">No campaigns were loaded for this org yet.</p>
-                ) : null}
-              </div>
+                      <option value="">Choose a campaign</option>
+                      {campaignOptions.map((campaign) => (
+                        <option key={campaign.campaign_id} value={campaign.campaign_id}>
+                          {campaign.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              {!hasSelectedCampaign ? (
-                <p className="text-xs text-yellow-300">Select a campaign before going READY.</p>
-              ) : !softphoneReadyForDialing ? (
-                <p className="text-xs text-yellow-300">Campaign selected. Waiting for verified SIP registration.</p>
-              ) : (
-                <p className="text-xs text-green-300">Campaign selected. You can now go READY.</p>
-              )}
-
-              <Button
-                onClick={goReady}
-                disabled={!canGoReady}
-                className={`w-full h-11 text-white font-semibold ${
-                  canGoReady
-                    ? "bg-green-600 hover:bg-green-500"
-                    : "bg-gray-700 text-gray-300 hover:bg-gray-700"
-                }`}
-              >
-                <Phone className="h-4 w-4 mr-2" />
-                {!hasSelectedCampaign
-                  ? "Select Campaign To Continue"
-                  : softphoneReadyForDialing
-                    ? "Go Ready"
-                    : "Waiting For Softphone"}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ── Waiting for call (READY / RESERVED) ── */}
-        {(isReady || isReserved) && (
-          <Card className="bg-gray-900 border-gray-700">
-            <CardContent className="pt-6 pb-4 text-center space-y-4">
-              <div className="flex items-center justify-center gap-2 text-green-400">
-                {isReserved ? (
-                  <>
-                    <PhoneCall className="h-8 w-8 animate-pulse" />
-                    <span className="text-lg font-medium">Connecting call…</span>
-                  </>
-                ) : (
-                  <>
-                    <Phone className="h-8 w-8" />
-                    <span className="text-lg font-medium">Waiting for next call</span>
-                  </>
-                )}
-              </div>
-
-              {session?.campaign_id && (
-                <p className="text-sm text-gray-400">
-                  Campaign: <span className="text-white">
-                    {campaigns.find((c) => c.campaign_id === session.campaign_id)?.name ?? session.campaign_id}
-                  </span>
-                </p>
-              )}
-
-              {humanReady ? (
-                <div className="rounded-lg border border-yellow-700 bg-yellow-900/30 px-4 py-3 text-sm text-yellow-200">
-                  {humanReady.stage === "beeping" ? "Human detected. Playing agent beep..." : "Human detected. Alerting agent..."}
-                </div>
-              ) : null}
-
-              <p className="text-xs text-gray-500">
-                Auto-next: <span className="text-white">{autoNextEnabled ? "Armed" : "Idle"}</span>
-              </p>
-
-              <div className="flex gap-2 justify-center">
-                {isReady && (
                   <Button
-                    variant="outline"
-                    onClick={() => transitionState("PAUSED", "manual_pause")}
-                    className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                    onClick={goReady}
+                    disabled={!readyEnabled || readyPending}
+                    className="h-11 w-full bg-green-600 font-semibold text-white hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-300"
                   >
-                    <Pause className="h-4 w-4 mr-2" />
-                    Pause
+                    {readyPending ? "Sending READY…" : "READY"}
                   </Button>
-                )}
-                <Button
-                  variant="outline"
-                  onClick={() => transitionState("OFFLINE", "logout")}
-                  className="border-red-800 text-red-400 hover:bg-red-900/30"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Log Off
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* ── Active call (INCALL) ── */}
-        {isInCall && (
-          <Card className="bg-blue-950 border-blue-700">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between text-blue-300">
-                <div className="flex items-center gap-2">
-                  <PhoneCall className="h-5 w-5 animate-pulse" />
-                  On Call
+                  {readyResult ? (
+                    <div
+                      className={`rounded-md border p-3 text-sm ${
+                        readyResult.ok
+                          ? "border-green-800 bg-green-950/40 text-green-200"
+                          : "border-red-800 bg-red-950/40 text-red-200"
+                      }`}
+                    >
+                      <div className="mb-2 flex items-center gap-2 font-medium">
+                        {readyResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                        READY response {readyResult.status}
+                      </div>
+                      <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs">
+                        {readyResult.text}
+                      </pre>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+
+              <Card className="border-gray-700 bg-gray-900">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Campaign Access</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div><span className="text-gray-400">org has campaigns:</span> {contract.campaign_access.org_has_campaigns ? "yes" : "no"}</div>
+                  <div><span className="text-gray-400">org campaign count:</span> {contract.campaign_access.org_campaign_count}</div>
+                  <div><span className="text-gray-400">user allowed to see campaigns:</span> {contract.campaign_access.user_allowed_to_see_campaigns ? "yes" : "no"}</div>
+                  <div><span className="text-gray-400">rendered campaign count:</span> {contract.campaign_access.rendered_campaign_count}</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="border-gray-700 bg-gray-900">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Why Unauthorized</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div><span className="text-gray-400">flag:</span> {contract.diagnosis.unauthorized ? "yes" : "no"}</div>
+                  <ul className="space-y-2 text-red-200">
+                    {contract.diagnosis.unauthorized_reasons.length > 0 ? (
+                      contract.diagnosis.unauthorized_reasons.map((reason) => (
+                        <li key={reason} className="rounded-md border border-red-900 bg-red-950/40 px-3 py-2">
+                          {reason}
+                        </li>
+                      ))
+                    ) : (
+                      <li className="rounded-md border border-green-900 bg-green-950/30 px-3 py-2 text-green-200">
+                        The current request did not produce a 401.
+                      </li>
+                    )}
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card className="border-gray-700 bg-gray-900">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Why Browser Softphone</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-yellow-100">
+                  <div className="rounded-md border border-yellow-900 bg-yellow-950/40 px-3 py-3">
+                    {contract.diagnosis.browser_softphone_reason}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="border-gray-700 bg-gray-900">
+              <CardHeader>
+                <CardTitle className="text-base text-gray-100">Next Step</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-gray-200">
+                <div className="rounded-md border border-blue-900 bg-blue-950/30 px-3 py-3">
+                  {contract.diagnosis.suggested_next_step}
                 </div>
-                <span className="font-mono text-lg text-white flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  {callTimer}
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Lead details */}
-              <div className="bg-blue-900/40 rounded-lg p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-blue-400" />
-                  <span className="font-medium text-white">{String(leadName)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-blue-400" />
-                  <span className="text-gray-300 font-mono">{String(leadPhone)}</span>
-                </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Call controls */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={toggleMute}
-                  className={`flex-1 border-gray-600 ${muted ? "bg-red-900/30 border-red-700 text-red-300" : "text-gray-300 hover:bg-gray-700"}`}
-                >
-                  {muted ? <MicOff className="h-4 w-4 mr-2" /> : <Mic className="h-4 w-4 mr-2" />}
-                  {muted ? "Unmute" : "Mute"}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700"
-                >
-                  <Volume2 className="h-4 w-4 mr-2" />
-                  Hold
-                </Button>
-                <Button
-                  onClick={endCall}
-                  className="flex-1 bg-red-600 hover:bg-red-500 text-white"
-                >
-                  <PhoneOff className="h-4 w-4 mr-2" />
-                  End Call
-                </Button>
-              </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="border-gray-700 bg-gray-900">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Raw /api/dialer/campaigns</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="text-sm text-gray-300">status: {contract.raw_campaigns_response.status}</div>
+                  <pre className="max-h-[32rem] overflow-auto rounded-md bg-gray-950 p-3 text-xs text-gray-200">
+                    {contract.raw_campaigns_response.text || formatJson(contract.raw_campaigns_response.json)}
+                  </pre>
+                </CardContent>
+              </Card>
 
-              {callInfo?.call_id && (
-                <p className="text-xs text-gray-500 text-center font-mono">
-                  Call ID: {callInfo.call_id}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ── Wrap state indicator (disposition modal auto-shows) ── */}
-        {isWrap && (
-          <Card className="bg-orange-950 border-orange-700">
-            <CardContent className="pt-6 pb-4 text-center space-y-3">
-              <div className="flex items-center justify-center gap-2 text-orange-300">
-                <Clock className="h-6 w-6" />
-                <span className="text-base font-medium">Wrap — submit disposition</span>
-              </div>
-              {wrapCountdown > 0 ? (
-                <div className="text-sm text-orange-200">Auto-ready in {wrapCountdown}s</div>
-              ) : null}
-              <Button
-                onClick={() => setShowDispModal(true)}
-                className="bg-orange-600 hover:bg-orange-500 text-white"
-              >
-                Open Disposition
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ── Paused card ── */}
-        {isPaused && (
-          <Card className="bg-gray-900 border-gray-700">
-            <CardContent className="pt-6 pb-4 text-center space-y-3">
-              <div className="flex items-center justify-center gap-2 text-gray-400">
-                <Pause className="h-6 w-6" />
-                <span className="text-base font-medium">Paused</span>
-              </div>
-              <div className="flex gap-2 justify-center">
-                <Button
-                  onClick={() => transitionState("READY", "resume")}
-                  className="bg-green-600 hover:bg-green-500 text-white"
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Resume
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => transitionState("OFFLINE", "logout")}
-                  className="border-red-800 text-red-400 hover:bg-red-900/30"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Log Off
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
+              <Card className="border-gray-700 bg-gray-900">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Raw /api/dialer/agents/self/softphone</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="text-sm text-gray-300">status: {contract.raw_softphone_response.status}</div>
+                  <pre className="max-h-[32rem] overflow-auto rounded-md bg-gray-950 p-3 text-xs text-gray-200">
+                    {contract.raw_softphone_response.text || formatJson(contract.raw_softphone_response.json)}
+                  </pre>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        ) : null}
       </div>
-
-      {/* ── Disposition Modal ─────────────────────────────────────────────── */}
-      <audio ref={softphone.audioRef} autoPlay playsInline />
-      <Dialog open={showDispModal} onOpenChange={setShowDispModal}>
-        <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-orange-400" />
-              Call Disposition
-            </DialogTitle>
-            <DialogDescription className="text-gray-400">
-              Select the outcome for this call before returning to ready.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 mt-2">
-            {/* Outcome grid */}
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.entries(OUTCOME_LABELS) as [DispositionOutcome, string][]).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setDispOutcome(key)}
-                  className={`rounded-lg border px-3 py-2 text-sm text-left transition-colors ${
-                    dispOutcome === key
-                      ? "bg-blue-600 border-blue-500 text-white"
-                      : "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* Callback date */}
-            {dispOutcome === "CALLBACK" && (
-              <div className="space-y-1">
-                <label className="text-xs text-gray-400">Callback date/time</label>
-                <input
-                  type="datetime-local"
-                  value={dispCallbackDate}
-                  onChange={(e) => setDispCallbackDate(e.target.value)}
-                  className="w-full rounded-md bg-gray-800 border border-gray-600 px-3 py-2 text-sm text-white"
-                />
-              </div>
-            )}
-
-            {/* Notes */}
-            <div className="space-y-1">
-              <label className="text-xs text-gray-400">Notes (optional)</label>
-              <Textarea
-                value={dispNotes}
-                onChange={(e) => setDispNotes(e.target.value)}
-                placeholder="Add call notes…"
-                className="bg-gray-800 border-gray-600 text-white placeholder-gray-500 min-h-[80px]"
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowDispModal(false)}
-                className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={submitDisposition}
-                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white"
-              >
-                Submit & Ready
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
