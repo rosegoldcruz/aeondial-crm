@@ -259,6 +259,7 @@ export default function DialerPage() {
         const body = (await response.json()) as DialerContract;
         if (!response.ok) throw new Error(formatJson(body));
         if (!cancelled) {
+          console.log("Dialer Contract:", body);
           setContract(body);
           const campaigns = extractCampaigns(body.raw_campaigns_response.json);
           if (campaigns.length === 1) {
@@ -267,6 +268,7 @@ export default function DialerPage() {
           }
         }
       } catch (error) {
+        console.error("Failed to load dialer contract:", error);
         if (!cancelled) setLoadError(error instanceof Error ? error.message : "Failed to load dialer contract");
       } finally {
         if (!cancelled) setLoading(false);
@@ -281,8 +283,12 @@ export default function DialerPage() {
       ? (contract.raw_softphone_response.json as JsonRecord) : null;
 
   const campaignOptions = useMemo<CampaignOption[]>(() => {
-    const campaigns = extractCampaigns(contract?.raw_campaigns_response.json);
-    return campaigns.map((c) => {
+    // Prefer direct Supabase org_campaigns (bypasses backend user-mapping issues)
+    const directCampaigns = contract?.campaign_access.org_campaigns ?? [];
+    const raw = directCampaigns.length > 0
+      ? directCampaigns
+      : extractCampaigns(contract?.raw_campaigns_response.json);
+    return raw.map((c) => {
       const id = c.campaign_id;
       if (typeof id !== "string" || !id.trim()) return null;
       const name = typeof c.name === "string" && c.name.trim() ? c.name.trim() : id;
@@ -294,9 +300,16 @@ export default function DialerPage() {
     typeof softphonePayload?.agent_id === "string" ? softphonePayload.agent_id
       : contract?.identity.userId || "";
 
+  // ARM is enabled when a campaign is selected and we have an agent identity.
+  // ARI registration check is advisory-only — backend validates on ARM.
+  const hasEndpoint = Boolean(contract?.registration.endpoint);
   const readyEnabled =
     Boolean(selectedCampaign) &&
-    Boolean(contract?.registration.endpoint) &&
+    hasEndpoint &&
+    !contract?.diagnosis.unauthorized &&
+    (Boolean(contract?.backend_user_mapping.has_exact_user_org_row) ||
+      Boolean(contract?.backend_user_mapping.email_org_row));
+  const ariConfirmed =
     contract?.registration.status === "registered" &&
     contract?.registration.source === "ari";
 
@@ -344,7 +357,9 @@ export default function DialerPage() {
             // Already disposed — wrap-up will clear on next poll when wrap_up_status != pending
           }
         }
-      } catch { /* non-fatal */ }
+      } catch (error) {
+        console.error("Polling for active call/wrap-up failed:", error);
+      }
     }
     void poll();
     const interval = setInterval(poll, 2000);
@@ -519,6 +534,16 @@ export default function DialerPage() {
 
         {contract ? (
           <>
+            {/* Debug View */}
+            <details className="mt-2 rounded-md border border-gray-700 bg-gray-900/50">
+              <summary className="cursor-pointer px-3 py-2 text-xs text-gray-400">
+                Debug View: Dialer Contract
+              </summary>
+              <pre className="overflow-x-auto p-3 text-[10px] leading-tight">
+                {formatJson(contract)}
+              </pre>
+            </details>
+
             {/* Active Org Required */}
             {contract.diagnosis.active_org_required && (
               <Card className="border-amber-800 bg-amber-950/30">
@@ -674,11 +699,12 @@ export default function DialerPage() {
                   <CardContent className="space-y-3">
                     <div className="grid gap-1 text-sm">
                       <div><span className="text-gray-400">agent:</span> {contract.identity.displayName || contract.identity.email || contract.identity.userId || "—"}</div>
-                      <div><span className="text-gray-400">endpoint:</span> {contract.registration.endpoint || "none"}</div>
+                      <div><span className="text-gray-400">endpoint:</span> {contract.registration.endpoint || contract.identity.userId || "—"}</div>
                       <div>
                         <span className="text-gray-400">registration:</span>{" "}
-                        <span className={contract.registration.status === "registered" && contract.registration.source === "ari" ? "text-green-400" : "text-red-400"}>
-                          {contract.registration.status || "—"} ({contract.registration.source || "—"})
+                        <span className={ariConfirmed ? "text-green-400" : "text-yellow-400"}>
+                          {contract.registration.status || "unverified"} ({contract.registration.source || "—"})
+                          {!ariConfirmed && <span className="ml-1 text-xs text-yellow-600">(SIP unconfirmed — calls may still work)</span>}
                         </span>
                       </div>
                     </div>
@@ -692,6 +718,13 @@ export default function DialerPage() {
                         <option value="">Choose a campaign</option>
                         {campaignOptions.map((c) => (<option key={c.campaign_id} value={c.campaign_id}>{c.label}</option>))}
                       </select>
+                      {campaignOptions.length === 0 && !loading && contract && (
+                        <p className="mt-1 text-xs text-gray-400">
+                          {contract.campaign_access.org_has_campaigns
+                            ? "You may not have access to any campaigns."
+                            : "No campaigns found for this organization."}
+                        </p>
+                      )}
                     </div>
                     <Button onClick={goReady} disabled={!readyEnabled || readyPending || sessionArmed}
                       className="h-10 w-full bg-green-600 font-semibold text-white hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-300">
