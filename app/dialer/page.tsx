@@ -225,6 +225,8 @@ export default function DialerPage() {
   const [sessionArmed, setSessionArmed] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [readyError, setReadyError] = useState<string | null>(null);
+  const [agentLegLive, setAgentLegLive] = useState(false);      // registration_verified=true AND channel_id set
+  const [agentReadyForDial, setAgentReadyForDial] = useState(false); // go-ready confirmed
   const [campaignStartPending, setCampaignStartPending] = useState(false);
   const [dialerRunning, setDialerRunning] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -300,18 +302,37 @@ export default function DialerPage() {
     typeof softphonePayload?.agent_id === "string" ? softphonePayload.agent_id
       : contract?.identity.userId || "";
 
-  // ARM is enabled when a campaign is selected and we have an agent identity.
-  // ARI registration check is advisory-only — backend validates on ARM.
+  // ARM is enabled only when a campaign is selected, endpoint is set, and SIP is confirmed registered.
   const hasEndpoint = Boolean(contract?.registration.endpoint);
   const readyEnabled =
     Boolean(selectedCampaign) &&
     hasEndpoint &&
+    ariConfirmed &&
     !contract?.diagnosis.unauthorized &&
     (Boolean(contract?.backend_user_mapping.has_exact_user_org_row) ||
       Boolean(contract?.backend_user_mapping.email_org_row));
   const ariConfirmed =
     contract?.registration.status === "registered" &&
     contract?.registration.source === "ari";
+
+  // ── Polling: agent leg status (every 2s while armed but leg not yet live) ──
+  useEffect(() => {
+    if (!sessionArmed || agentLegLive || !agentId) return;
+    let cancelled = false;
+    async function pollLeg() {
+      try {
+        const res = await fetch(`/api/dialer/agents/${encodeURIComponent(agentId)}/session`);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { session?: { registration_verified?: boolean; channel_id?: string } };
+        if (data?.session?.registration_verified && data?.session?.channel_id) {
+          if (!cancelled) setAgentLegLive(true);
+        }
+      } catch { /* non-fatal */ }
+    }
+    void pollLeg();
+    const interval = setInterval(pollLeg, 2000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [sessionArmed, agentLegLive, agentId]);
 
   // ── Polling: campaign status (every 3s) ──
   useEffect(() => {
@@ -366,7 +387,7 @@ export default function DialerPage() {
     return () => { cancelled = true; clearInterval(interval); };
   }, [dialerRunning, activeCall?.has_active_call, wrapUp?.has_wrap_up]);
 
-  // Arm Agent Session
+  // Arm Agent Session (SIP already confirmed registered by readyEnabled gate)
   const goReady = useCallback(async () => {
     if (!contract || !readyEnabled) return;
     setReadyPending(true);
@@ -385,6 +406,8 @@ export default function DialerPage() {
       const text = await response.text();
       if (!response.ok) { setReadyError(`Session failed (${response.status}): ${text}`); return; }
       setSessionArmed(true);
+      setAgentLegLive(false);
+      setAgentReadyForDial(false);
       try {
         const parsed = JSON.parse(text);
         if (parsed.session?.session_id) setSessionId(parsed.session.session_id);
@@ -395,9 +418,28 @@ export default function DialerPage() {
     } finally { setReadyPending(false); }
   }, [contract, readyEnabled, agentId, selectedCampaign, softphonePayload]);
 
+  // Confirm agent leg is live → transition OFFLINE to READY
+  const goReadyAfterLeg = useCallback(async () => {
+    if (!sessionId || !agentLegLive || readyPending) return;
+    setReadyPending(true);
+    setReadyError(null);
+    try {
+      const response = await fetch(`/api/dialer/agents/${encodeURIComponent(sessionId)}/go-ready`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const text = await response.text();
+      if (!response.ok) { setReadyError(`Go-ready failed (${response.status}): ${text}`); return; }
+      setAgentReadyForDial(true);
+    } catch (error) {
+      setReadyError(error instanceof Error ? error.message : "Go-ready request failed");
+    } finally { setReadyPending(false); }
+  }, [sessionId, agentLegLive, readyPending]);
+
   // Start campaign
   const startCampaign = useCallback(async () => {
-    if (!selectedCampaign || !sessionArmed) return;
+    if (!selectedCampaign || !agentReadyForDial) return;
     setCampaignStartPending(true);
     setStartError(null);
     try {
@@ -726,14 +768,38 @@ export default function DialerPage() {
                         </p>
                       )}
                     </div>
+                    {/* Step 1: Arm session — requires ARI confirmed */}
                     <Button onClick={goReady} disabled={!readyEnabled || readyPending || sessionArmed}
                       className="h-10 w-full bg-green-600 font-semibold text-white hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-300">
-                      {readyPending ? "Arming…" : sessionArmed ? "✓ Session Armed" : "1. Arm Agent Session"}
+                      {readyPending && !agentLegLive ? "Arming…" : sessionArmed ? "✓ Session Armed" : "1. Arm Agent Session"}
                     </Button>
+                    {!readyEnabled && !ariConfirmed && hasEndpoint && (
+                      <div className="rounded-md border border-yellow-800 bg-yellow-950/40 p-2 text-xs text-yellow-200">
+                        <AlertCircle className="mr-1 inline h-3 w-3" /> SIP registration required. Register your softphone first.
+                      </div>
+                    )}
                     {readyError && <div className="rounded-md border border-red-800 bg-red-950/40 p-2 text-xs text-red-200"><AlertCircle className="mr-1 inline h-3 w-3" /> {readyError}</div>}
-                    <Button onClick={startCampaign} disabled={!sessionArmed || campaignStartPending || dialerRunning}
+
+                    {/* Step 1.5: Waiting for agent leg */}
+                    {sessionArmed && !agentLegLive && (
+                      <div className="flex items-center gap-2 rounded-md border border-blue-800 bg-blue-950/30 p-3 text-sm text-blue-200">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Connecting agent line… (answer your softphone)
+                      </div>
+                    )}
+
+                    {/* Step 2: Go Ready — available once agent leg is live */}
+                    <Button
+                      onClick={goReadyAfterLeg}
+                      disabled={!agentLegLive || readyPending || agentReadyForDial || dialerRunning}
+                      className="h-10 w-full bg-yellow-600 font-semibold text-white hover:bg-yellow-500 disabled:bg-gray-700 disabled:text-gray-300"
+                    >
+                      {readyPending && agentLegLive ? "Going Ready…" : agentReadyForDial ? "✓ Agent Ready" : "2. Go Ready"}
+                    </Button>
+
+                    {/* Step 3: Start campaign dialer */}
+                    <Button onClick={startCampaign} disabled={!agentReadyForDial || campaignStartPending || dialerRunning}
                       className="h-10 w-full bg-blue-600 font-semibold text-white hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-300">
-                      {campaignStartPending ? "Starting…" : dialerRunning ? "✓ Dialer Running" : "2. Start Campaign Dialer"}
+                      {campaignStartPending ? "Starting…" : dialerRunning ? "✓ Dialer Running" : "3. Start Campaign Dialer"}
                     </Button>
                     {startError && <div className="rounded-md border border-red-800 bg-red-950/40 p-2 text-xs text-red-200"><AlertCircle className="mr-1 inline h-3 w-3" /> {startError}</div>}
                     {dialerRunning && (
