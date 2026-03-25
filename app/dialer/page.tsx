@@ -304,6 +304,9 @@ export default function DialerPage() {
 
   // ARM is enabled only when a campaign is selected, endpoint is set, and SIP is confirmed registered.
   const hasEndpoint = Boolean(contract?.registration.endpoint);
+  const ariConfirmed =
+    contract?.registration.status === "registered" &&
+    contract?.registration.source === "ari";
   const readyEnabled =
     Boolean(selectedCampaign) &&
     hasEndpoint &&
@@ -311,9 +314,6 @@ export default function DialerPage() {
     !contract?.diagnosis.unauthorized &&
     (Boolean(contract?.backend_user_mapping.has_exact_user_org_row) ||
       Boolean(contract?.backend_user_mapping.email_org_row));
-  const ariConfirmed =
-    contract?.registration.status === "registered" &&
-    contract?.registration.source === "ari";
 
   // ── Polling: agent leg status (every 2s while armed but leg not yet live) ──
   useEffect(() => {
