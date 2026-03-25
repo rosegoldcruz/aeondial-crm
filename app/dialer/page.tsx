@@ -319,15 +319,28 @@ export default function DialerPage() {
   useEffect(() => {
     if (!sessionArmed || agentLegLive || !agentId) return;
     let cancelled = false;
+    let consecutiveErrors = 0;
     async function pollLeg() {
       try {
         const res = await fetch(`/api/dialer/agents/${encodeURIComponent(agentId)}/session`);
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        if (!res.ok) {
+          consecutiveErrors += 1;
+          // Surface auth/server errors after 3 consecutive failures so the user
+          // knows why the spinner is stuck rather than silently looping forever.
+          if (consecutiveErrors >= 3) {
+            const body = await res.text().catch(() => '');
+            setReadyError(`Session poll failed (${res.status}): ${body.slice(0, 120) || 'auth error — try refreshing the page'}`);
+          }
+          return;
+        }
+        consecutiveErrors = 0;
+        setReadyError(null);
         const data = (await res.json()) as { session?: { registration_verified?: boolean; channel_id?: string } };
         if (data?.session?.registration_verified && data?.session?.channel_id) {
           if (!cancelled) setAgentLegLive(true);
         }
-      } catch { /* non-fatal */ }
+      } catch { /* network error — non-fatal, will retry */ }
     }
     void pollLeg();
     const interval = setInterval(pollLeg, 2000);
