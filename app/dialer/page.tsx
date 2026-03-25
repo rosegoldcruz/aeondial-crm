@@ -452,7 +452,7 @@ export default function DialerPage() {
     } catch (error) {
       setStartError(error instanceof Error ? error.message : "Campaign start failed");
     } finally { setCampaignStartPending(false); }
-  }, [selectedCampaign, sessionArmed]);
+  }, [selectedCampaign, agentReadyForDial]);
 
   // Stop campaign
   const stopCampaign = useCallback(async () => {
