@@ -9,7 +9,8 @@ import {
 } from "@clerk/nextjs"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import ClientLayout from "./client-layout"
+import "./aeon-globals.css"
+import AppShell from "@/components/shell/AppShell"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -71,7 +72,7 @@ export default function RootLayout({
               </div>
             </SignedOut>
           </header>
-          <ClientLayout>{children}</ClientLayout>
+          <AppShell>{children}</AppShell>
         </ClerkProvider>
       </body>
     </html>
