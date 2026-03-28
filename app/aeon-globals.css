@@ -34,11 +34,7 @@
 }
 
 /* ── GLOBAL RESET FOR SHELL ── */
-.aeon-app *,
-.aeon-app *::before,
-.aeon-app *::after {
-  cursor: none;
-}
+/* cursor: none removed — no custom cursor renderer is present */
 
 /* ── AMBIENT BACKGROUND ── */
 .aeon-grid-overlay {
@@ -397,3 +393,141 @@
 .aeon-badge.won   { background: rgba(0,255,157,.1);   color: var(--aeon-success); }
 .aeon-badge.nurture { background: rgba(232,244,248,.07); color: var(--aeon-text-dim); }
 .aeon-badge.live  { background: rgba(255,60,172,.2);  color: var(--aeon-accent2); animation: aeon-blink 1.5s infinite; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   CLIENTLAYOUT THEME OVERRIDES
+   Targets ClientLayout's existing Tailwind class names.
+   VISUAL PROPERTIES ONLY — display, flex, grid, width, height,
+   overflow, z-index, position, padding, margin, gap are never touched.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Body background ── */
+body {
+  background-color: var(--aeon-bg) !important;
+}
+
+/* ── Custom cursor: hide native when AeonCursor is mounted ── */
+body.aeon-custom-cursor,
+body.aeon-custom-cursor * {
+  cursor: none !important;
+}
+
+/* ── Sidebar (motion.aside renders as <aside>) ── */
+aside {
+  background-color: var(--aeon-bg2) !important;
+  border-color: var(--aeon-border) !important;
+}
+
+/* Sidebar internal dividers */
+aside .border-b,
+aside .border-t {
+  border-color: var(--aeon-border) !important;
+}
+
+/* Sidebar brand / logo text (text-orange-500) */
+aside .text-orange-500 {
+  color: var(--aeon-accent) !important;
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+}
+
+/* Sidebar version / muted text */
+aside .text-neutral-500 {
+  color: var(--aeon-text-muted) !important;
+}
+
+/* Nav font */
+aside nav {
+  font-family: var(--aeon-font-mono);
+}
+
+/* Nav item — inactive text */
+aside a.text-neutral-400 {
+  color: var(--aeon-text-dim) !important;
+}
+
+/* Nav item — inactive hover */
+aside a.hover\:bg-neutral-800:hover {
+  background-color: rgba(0, 229, 255, 0.04) !important;
+}
+aside a.hover\:text-white:hover {
+  color: var(--aeon-text) !important;
+}
+
+/* Nav item — active state (bg-orange-500/20 text-orange-500) */
+aside a.bg-orange-500\/20 {
+  background-color: rgba(0, 229, 255, 0.06) !important;
+  color: var(--aeon-accent) !important;
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.12) !important;
+  border-left: 2px solid var(--aeon-accent) !important;
+}
+
+/* Active nav glow overlay (motion layoutId div inside active link) */
+aside a.bg-orange-500\/20 .absolute {
+  background: linear-gradient(90deg, rgba(0, 229, 255, 0.08), rgba(0, 229, 255, 0.03)) !important;
+}
+
+/* Submenu active item */
+aside .text-orange-500.bg-neutral-800 {
+  background-color: rgba(0, 229, 255, 0.06) !important;
+  color: var(--aeon-accent) !important;
+}
+
+/* Submenu inactive item */
+aside a.text-neutral-500 {
+  color: var(--aeon-text-dim) !important;
+}
+
+/* Sidebar toggle / icon buttons */
+aside button.text-neutral-400 {
+  color: var(--aeon-text-dim) !important;
+}
+aside button.hover\:text-orange-500:hover {
+  color: var(--aeon-accent) !important;
+}
+aside button.hover\:bg-neutral-800:hover {
+  background-color: rgba(0, 229, 255, 0.04) !important;
+}
+
+/* ── Main layout wrapper — strip Tailwind bg from flex container ── */
+.flex.h-screen > .flex-1 {
+  background-color: var(--aeon-bg) !important;
+}
+
+/* ── Topbar header ── */
+header.h-16 {
+  background-color: var(--aeon-bg2) !important;
+  border-color: var(--aeon-border) !important;
+}
+
+header.h-16 .text-neutral-400,
+header.h-16 .text-neutral-500 {
+  color: var(--aeon-text-dim) !important;
+}
+
+/* Status dot: green → AEON accent */
+header.h-16 .bg-green-500 {
+  background-color: var(--aeon-accent) !important;
+  box-shadow: 0 0 6px var(--aeon-accent) !important;
+}
+
+/* ── Main content area ── */
+main.bg-neutral-950 {
+  background-color: var(--aeon-bg) !important;
+}
+
+/* ── Mobile shell header ── */
+header.bg-neutral-900 {
+  background-color: var(--aeon-bg2) !important;
+  border-color: var(--aeon-border) !important;
+}
+
+/* Mobile logo text */
+header.bg-neutral-900 .text-orange-500 {
+  color: var(--aeon-accent) !important;
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+}
+
+/* Mobile main */
+main.bg-neutral-950.pb-24 {
+  background-color: var(--aeon-bg) !important;
+}

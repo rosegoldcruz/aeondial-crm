@@ -10,7 +10,8 @@ import {
 import { Inter } from "next/font/google"
 import "./globals.css"
 import "./aeon-globals.css"
-import AppShell from "@/components/shell/AppShell"
+import ClientLayout from "./client-layout"
+import AeonCursor from "@/components/shell/AeonCursor"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -72,7 +73,8 @@ export default function RootLayout({
               </div>
             </SignedOut>
           </header>
-          <AppShell>{children}</AppShell>
+          <AeonCursor />
+          <ClientLayout>{children}</ClientLayout>
         </ClerkProvider>
       </body>
     </html>
