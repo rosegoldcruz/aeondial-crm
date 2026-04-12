@@ -2,40 +2,17 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { LayoutDashboard, Calendar, MoreVertical, ArrowRight, ArrowUp } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion"
+import { motion } from "framer-motion"
 
 export default function AnalyticsDashboard() {
   const [startDate, setStartDate] = useState("2025-09-29")
   const [endDate, setEndDate] = useState("2025-10-29")
-  const [hoveredCard, setHoveredCard] = useState<number | null>(null)
-
-  const mouseX = useMotionValue(0)
-  const mouseY = useMotionValue(0)
-
-  const springConfig = { damping: 25, stiffness: 150 }
-  const smoothMouseX = useSpring(mouseX, springConfig)
-  const smoothMouseY = useSpring(mouseY, springConfig)
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      // Only update if no card is hovered (camera lock)
-      if (hoveredCard === null) {
-        const x = (e.clientX - window.innerWidth / 2) / window.innerWidth
-        const y = (e.clientY - window.innerHeight / 2) / window.innerHeight
-        mouseX.set(x)
-        mouseY.set(y)
-      }
-    }
-
-    window.addEventListener("mousemove", handleMouseMove)
-    return () => window.removeEventListener("mousemove", handleMouseMove)
-  }, [hoveredCard, mouseX, mouseY])
 
   // Opportunity Status data
   const opportunityStatusData = [{ name: "Open", value: 1, color: "#3B82F6" }]
@@ -94,42 +71,12 @@ export default function AnalyticsDashboard() {
 
   const ParallaxCard = ({
     children,
-    depth,
-    index,
   }: {
     children: React.ReactNode
     depth: number
     index: number
   }) => {
-    const isHovered = hoveredCard === index
-    const isOtherHovered = hoveredCard !== null && hoveredCard !== index
-
-    // Calculate parallax offset based on depth
-    const x = useTransform(smoothMouseX, [-1, 1], [-depth * 20, depth * 20])
-    const y = useTransform(smoothMouseY, [-1, 1], [-depth * 20, depth * 20])
-
-    return (
-      <motion.div
-        style={{
-          x: isHovered ? 0 : x,
-          y: isHovered ? 0 : y,
-          zIndex: isHovered ? 50 : 10 + depth,
-        }}
-        animate={{
-          scale: isHovered ? 1.05 : isOtherHovered ? 0.95 : 1,
-          filter: isOtherHovered ? "blur(2px) brightness(0.7)" : "blur(0px) brightness(1)",
-        }}
-        transition={{
-          scale: { duration: 0.3, ease: "easeOut" },
-          filter: { duration: 0.3 },
-        }}
-        onHoverStart={() => setHoveredCard(index)}
-        onHoverEnd={() => setHoveredCard(null)}
-        className="relative"
-      >
-        {children}
-      </motion.div>
-    )
+    return <div className="relative">{children}</div>
   }
 
   return (
@@ -141,19 +88,9 @@ export default function AnalyticsDashboard() {
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] as const }}
       >
         <div className="flex items-center gap-3">
-          <motion.div
-            animate={{
-              boxShadow: [
-                "0 0 20px rgba(249, 115, 22, 0.3)",
-                "0 0 30px rgba(249, 115, 22, 0.5)",
-                "0 0 20px rgba(249, 115, 22, 0.3)",
-              ],
-            }}
-            transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-            className="rounded-lg p-1"
-          >
+          <div className="rounded-lg p-1">
             <LayoutDashboard className="w-8 h-8 text-orange-500" />
-          </motion.div>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-orange-500">Dashboard</h1>
         </div>
 
@@ -192,15 +129,8 @@ export default function AnalyticsDashboard() {
         {/* Card 1: Opportunity Status - Depth 3 (furthest) */}
         <motion.div variants={cardVariants}>
           <ParallaxCard depth={3} index={0}>
-            <motion.div
-              whileHover={{
-                boxShadow: "0 0 40px rgba(249, 115, 22, 0.4)",
-              }}
-              transition={{ duration: 0.2 }}
-              className="relative group"
-            >
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg opacity-0 group-hover:opacity-100 blur transition duration-300" />
-              <Card className="relative bg-neutral-900 border-neutral-800 hover:border-orange-500/50 transition-colors">
+            <div className="relative">
+              <Card className="relative bg-neutral-900 border-neutral-800">
                 <CardHeader>
                   <div className="flex items-center justify-between mb-4">
                     <CardTitle className="text-white text-lg">Opportunity Status</CardTitle>
@@ -262,22 +192,15 @@ export default function AnalyticsDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           </ParallaxCard>
         </motion.div>
 
         {/* Card 2: Opportunity Value - Depth 2 (middle) */}
         <motion.div variants={cardVariants}>
           <ParallaxCard depth={2} index={1}>
-            <motion.div
-              whileHover={{
-                boxShadow: "0 0 40px rgba(249, 115, 22, 0.4)",
-              }}
-              transition={{ duration: 0.2 }}
-              className="relative group"
-            >
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg opacity-0 group-hover:opacity-100 blur transition duration-300" />
-              <Card className="relative bg-neutral-900 border-neutral-800 hover:border-orange-500/50 transition-colors">
+            <div className="relative">
+              <Card className="relative bg-neutral-900 border-neutral-800">
                 <CardHeader>
                   <div className="flex items-center justify-between mb-4">
                     <CardTitle className="text-white text-lg">Opportunity Value</CardTitle>
@@ -322,22 +245,15 @@ export default function AnalyticsDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           </ParallaxCard>
         </motion.div>
 
         {/* Card 3: Conversion - Depth 1 (closest) */}
         <motion.div variants={cardVariants}>
           <ParallaxCard depth={1} index={2}>
-            <motion.div
-              whileHover={{
-                boxShadow: "0 0 40px rgba(249, 115, 22, 0.4)",
-              }}
-              transition={{ duration: 0.2 }}
-              className="relative group"
-            >
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg opacity-0 group-hover:opacity-100 blur transition duration-300" />
-              <Card className="relative bg-neutral-900 border-neutral-800 hover:border-orange-500/50 transition-colors">
+            <div className="relative">
+              <Card className="relative bg-neutral-900 border-neutral-800">
                 <CardHeader>
                   <div className="flex items-center justify-between mb-4">
                     <CardTitle className="text-white text-lg">Conversion</CardTitle>
@@ -391,7 +307,7 @@ export default function AnalyticsDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           </ParallaxCard>
         </motion.div>
       </motion.div>
@@ -405,15 +321,8 @@ export default function AnalyticsDashboard() {
         {/* Card 4: Funnel - Depth 2 */}
         <motion.div variants={cardVariants}>
           <ParallaxCard depth={2} index={3}>
-            <motion.div
-              whileHover={{
-                boxShadow: "0 0 40px rgba(249, 115, 22, 0.4)",
-              }}
-              transition={{ duration: 0.2 }}
-              className="relative group"
-            >
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg opacity-0 group-hover:opacity-100 blur transition duration-300" />
-              <Card className="relative bg-neutral-900 border-neutral-800 hover:border-orange-500/50 transition-colors">
+            <div className="relative">
+              <Card className="relative bg-neutral-900 border-neutral-800">
                 <CardHeader>
                   <div className="flex items-center justify-between mb-4">
                     <CardTitle className="text-white text-lg">Funnel</CardTitle>
@@ -469,22 +378,15 @@ export default function AnalyticsDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           </ParallaxCard>
         </motion.div>
 
         {/* Card 5: Stage Distribution - Depth 1 */}
         <motion.div variants={cardVariants}>
           <ParallaxCard depth={1} index={4}>
-            <motion.div
-              whileHover={{
-                boxShadow: "0 0 40px rgba(249, 115, 22, 0.4)",
-              }}
-              transition={{ duration: 0.2 }}
-              className="relative group"
-            >
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg opacity-0 group-hover:opacity-100 blur transition duration-300" />
-              <Card className="relative bg-neutral-900 border-neutral-800 hover:border-orange-500/50 transition-colors">
+            <div className="relative">
+              <Card className="relative bg-neutral-900 border-neutral-800">
                 <CardHeader>
                   <div className="flex items-center justify-between mb-4">
                     <CardTitle className="text-white text-lg">Stage Distribution</CardTitle>
@@ -566,7 +468,7 @@ export default function AnalyticsDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           </ParallaxCard>
         </motion.div>
       </motion.div>

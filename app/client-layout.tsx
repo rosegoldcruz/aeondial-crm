@@ -258,22 +258,7 @@ export default function ClientLayout({
     }
   }, [animConfig.enableGlow, governor.animationScale])
 
-  useEffect(() => {
-    if (animConfig.enableMicroAnimations) {
-      Object.values(navItemsRef.current).forEach((el) => {
-        if (el) {
-          gsap.to(el, {
-            x: "random(-2, 2)",
-            y: "random(-1, 1)",
-            duration: "random(2, 4)",
-            repeat: -1,
-            yoyo: true,
-            ease: "sine.inOut",
-          })
-        }
-      })
-    }
-  }, [animConfig.enableMicroAnimations])
+  // Removed micro-jitter loop from nav items to keep shell motion stable.
 
   // Close mobile sidebar on route change
   useEffect(() => {
