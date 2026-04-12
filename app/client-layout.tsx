@@ -453,8 +453,8 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
         </aside>
 
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <header className="md:hidden sticky top-0 z-40 h-12 flex items-center justify-between px-4 bg-[#0a0a0a] border-b border-[#262626] flex-shrink-0">
-            <span className="text-sm font-bold text-[#FF6B35] tracking-widest">AEON DIAL</span>
+          <header className="md:hidden sticky top-0 z-40 h-12 flex items-center justify-between px-4 flex-shrink-0" style={{ background: 'var(--cyber-bg-dark)', borderBottom: '1px solid var(--cyber-border)' }}>
+            <span style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--cyber-cyan)', textShadow: '0 0 12px rgba(0, 240, 255, 0.35)' }}>AEON DIAL</span>
             <div className="flex items-center gap-2 ml-auto">
               <SignedIn>
                 <OrganizationSwitcher
@@ -463,8 +463,8 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
                     elements: {
                       rootBox: "h-7",
                       organizationSwitcherTrigger:
-                        "h-7 text-xs text-white bg-[#1a1a1a] border border-[#262626] rounded-md px-2 py-1",
-                      organizationSwitcherTriggerIcon: "text-[#FF6B35]",
+                        "h-7 text-xs bg-[#1a1a1a] rounded-md px-2 py-1",
+                      organizationSwitcherTriggerIcon: "text-[#00f0ff]",
                     },
                   }}
                 />

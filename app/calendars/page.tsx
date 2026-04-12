@@ -16,7 +16,6 @@ import {
   Edit,
   Trash2,
   MoreVertical,
-  Filter,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -104,6 +103,7 @@ export default function CalendarsPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [visibleUsers, setVisibleUsers] = useState<number[]>(users.map((u) => u.id))
+  const [selectedDay, setSelectedDay] = useState<number | null>(null)
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear()
@@ -148,66 +148,82 @@ export default function CalendarsPage() {
 
   const days = getDaysInMonth(currentDate)
   const monthName = currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+  const today = new Date()
+  const isCurrentMonth = currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear()
+  const selectedDayAppointments = selectedDay ? getAppointmentsForDay(selectedDay) : []
 
   return (
-    <div className="h-full bg-black text-white">
-      {/* Header */}
-      <div className="border-b border-neutral-800 bg-neutral-900">
-        <div className="flex items-center gap-6 px-6 py-3">
+    <div className="h-full" style={{ background: 'var(--cyber-bg-darkest)', color: 'var(--cyber-text-primary)' }}>
+      {/* Tab bar */}
+      <div style={{ borderBottom: '1px solid var(--cyber-border)', background: 'var(--cyber-bg-dark)' }}>
+        <div className="flex items-center gap-4 px-4 py-2">
           <button
             onClick={() => setActiveTab("calendar")}
-            className={`text-sm font-medium pb-3 border-b-2 transition-colors ${
-              activeTab === "calendar"
-                ? "text-orange-500 border-orange-500"
-                : "text-neutral-400 border-transparent hover:text-white"
-            }`}
+            style={{
+              fontFamily: '"Orbitron", sans-serif',
+              fontSize: '0.7rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              paddingBottom: '8px',
+              borderBottom: activeTab === 'calendar' ? '2px solid var(--cyber-cyan)' : '2px solid transparent',
+              color: activeTab === 'calendar' ? 'var(--cyber-cyan)' : 'var(--cyber-text-muted)',
+            }}
           >
-            Calendars
+            Calendar
           </button>
           <button
             onClick={() => setActiveTab("list")}
-            className={`text-sm font-medium pb-3 border-b-2 transition-colors ${
-              activeTab === "list"
-                ? "text-orange-500 border-orange-500"
-                : "text-neutral-400 border-transparent hover:text-white"
-            }`}
+            style={{
+              fontFamily: '"Orbitron", sans-serif',
+              fontSize: '0.7rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              paddingBottom: '8px',
+              borderBottom: activeTab === 'list' ? '2px solid var(--cyber-cyan)' : '2px solid transparent',
+              color: activeTab === 'list' ? 'var(--cyber-cyan)' : 'var(--cyber-text-muted)',
+            }}
           >
-            Appointment List View
+            List
           </button>
-          <button className="text-sm font-medium pb-3 text-neutral-400 hover:text-white">
+          <button
+            className="ml-auto p-2"
+            style={{ color: 'var(--cyber-text-muted)' }}
+          >
             <Settings className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row min-h-[calc(100vh-8rem)]">
-        {/* Left Sidebar */}
-        <div className="w-full lg:w-64 border-b lg:border-b-0 lg:border-r border-neutral-800 bg-neutral-900 p-4 overflow-y-auto">
+        {/* Sidebar — desktop only */}
+        <div className="hidden lg:block w-64 border-r p-4 overflow-y-auto" style={{ borderColor: 'var(--cyber-border)', background: 'var(--cyber-bg-dark)' }}>
           {/* Mini Calendar */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <button onClick={previousMonth} className="p-1 hover:bg-neutral-800 rounded">
+              <button onClick={previousMonth} className="p-1 rounded" style={{ color: 'var(--cyber-text-secondary)' }}>
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-sm font-medium">{monthName}</span>
-              <button onClick={nextMonth} className="p-1 hover:bg-neutral-800 rounded">
+              <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'var(--cyber-text-primary)' }}>{monthName}</span>
+              <button onClick={nextMonth} className="p-1 rounded" style={{ color: 'var(--cyber-text-secondary)' }}>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
             <div className="grid grid-cols-7 gap-1 text-xs">
-              {["S", "M", "T", "W", "T", "F", "S"].map((day) => (
-                <div key={day} className="text-center text-neutral-500 font-medium">
+              {["S", "M", "T", "W", "T", "F", "S"].map((day, i) => (
+                <div key={i} className="text-center" style={{ fontFamily: '"Orbitron", sans-serif', color: 'var(--cyber-cyan)', fontSize: '0.6rem' }}>
                   {day}
                 </div>
               ))}
               {days.map((day, idx) => (
                 <div
                   key={idx}
-                  className={`text-center py-1 rounded ${day ? "hover:bg-neutral-800 cursor-pointer" : ""} ${
-                    day === new Date().getDate() && currentDate.getMonth() === new Date().getMonth()
-                      ? "bg-orange-500 text-white"
-                      : "text-neutral-400"
-                  }`}
+                  className={`text-center py-1 rounded cursor-pointer`}
+                  style={{
+                    fontFamily: '"JetBrains Mono", monospace',
+                    fontSize: '0.7rem',
+                    color: day === today.getDate() && isCurrentMonth ? 'var(--cyber-bg-darkest)' : 'var(--cyber-text-secondary)',
+                    background: day === today.getDate() && isCurrentMonth ? 'var(--cyber-cyan)' : 'transparent',
+                  }}
                 >
                   {day || ""}
                 </div>
@@ -217,7 +233,9 @@ export default function CalendarsPage() {
 
           {/* Users Filter */}
           <div className="mb-6">
-            <h3 className="text-sm font-medium mb-3">Users</h3>
+            <h3 style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cyber-text-muted)', marginBottom: '12px' }}>
+              <span style={{ color: 'var(--cyber-cyan)' }}>// </span>Users
+            </h3>
             <div className="space-y-2">
               {users.map((user) => (
                 <div key={user.id} className="flex items-center gap-2">
@@ -226,7 +244,7 @@ export default function CalendarsPage() {
                     onCheckedChange={() => toggleUserVisibility(user.id)}
                   />
                   <div className={`w-3 h-3 rounded-full ${user.color}`}></div>
-                  <span className="text-sm text-neutral-300">{user.name}</span>
+                  <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem', color: 'var(--cyber-text-secondary)' }}>{user.name}</span>
                 </div>
               ))}
             </div>
@@ -234,19 +252,21 @@ export default function CalendarsPage() {
 
           {/* Calendars Filter */}
           <div>
-            <h3 className="text-sm font-medium mb-3">Calendars</h3>
+            <h3 style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cyber-text-muted)', marginBottom: '12px' }}>
+              <span style={{ color: 'var(--cyber-cyan)' }}>// </span>Calendars
+            </h3>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Checkbox defaultChecked />
-                <span className="text-sm text-neutral-300">Team Calendar</span>
+                <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem', color: 'var(--cyber-text-secondary)' }}>Team Calendar</span>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox defaultChecked />
-                <span className="text-sm text-neutral-300">Personal</span>
+                <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem', color: 'var(--cyber-text-secondary)' }}>Personal</span>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox />
-                <span className="text-sm text-neutral-300">External</span>
+                <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem', color: 'var(--cyber-text-secondary)' }}>External</span>
               </div>
             </div>
           </div>
@@ -257,180 +277,263 @@ export default function CalendarsPage() {
           {activeTab === "calendar" ? (
             <div className="h-full flex flex-col">
               {/* Calendar Controls */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-3 sm:px-6 py-4 border-b border-neutral-800">
-                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                  <div className="flex items-center gap-2">
-                    <button onClick={previousMonth} className="p-2 hover:bg-neutral-800 rounded">
-                      <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <button onClick={nextMonth} className="p-2 hover:bg-neutral-800 rounded">
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <h2 className="text-xl font-semibold">{monthName}</h2>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={goToToday}
-                    className="border-neutral-700 hover:bg-neutral-800 bg-transparent"
-                  >
-                    Today
-                  </Button>
+              <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--cyber-border)' }}>
+                <div className="flex items-center gap-2">
+                  <button onClick={previousMonth} className="p-2 rounded" style={{ color: 'var(--cyber-text-secondary)' }}>
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <h2 style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cyber-text-primary)' }}>{monthName}</h2>
+                  <button onClick={nextMonth} className="p-2 rounded" style={{ color: 'var(--cyber-text-secondary)' }}>
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1 bg-neutral-800 rounded-lg p-1">
-                    <button
-                      onClick={() => setView("month")}
-                      className={`px-3 py-1 text-sm rounded ${
-                        view === "month" ? "bg-orange-500 text-white" : "text-neutral-400 hover:text-white"
-                      }`}
-                    >
-                      Month
-                    </button>
-                    <button
-                      onClick={() => setView("week")}
-                      className={`px-3 py-1 text-sm rounded ${
-                        view === "week" ? "bg-orange-500 text-white" : "text-neutral-400 hover:text-white"
-                      }`}
-                    >
-                      Week
-                    </button>
-                    <button
-                      onClick={() => setView("day")}
-                      className={`px-3 py-1 text-sm rounded ${
-                        view === "day" ? "bg-orange-500 text-white" : "text-neutral-400 hover:text-white"
-                      }`}
-                    >
-                      Day
-                    </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={goToToday}
+                    className="hidden sm:block px-3 py-1 text-xs rounded"
+                    style={{
+                      fontFamily: '"Orbitron", sans-serif',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      border: '1px solid var(--cyber-border)',
+                      color: 'var(--cyber-cyan)',
+                      background: 'transparent',
+                    }}
+                  >
+                    Today
+                  </button>
+                  <div className="hidden sm:flex items-center gap-1 p-1 rounded" style={{ background: 'var(--cyber-surface)' }}>
+                    {(["month", "week", "day"] as const).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setView(v)}
+                        className="px-3 py-1 rounded"
+                        style={{
+                          fontFamily: '"Orbitron", sans-serif',
+                          fontSize: '0.65rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          background: view === v ? 'rgba(0,240,255,0.15)' : 'transparent',
+                          color: view === v ? 'var(--cyber-cyan)' : 'var(--cyber-text-muted)',
+                        }}
+                      >
+                        {v}
+                      </button>
+                    ))}
                   </div>
-                  <Button onClick={() => setShowCreateModal(true)} className="bg-orange-500 hover:bg-orange-600">
-                    <Plus className="w-4 h-4 mr-2" />
-                    New
+                  <Button
+                    onClick={() => setShowCreateModal(true)}
+                    className="h-8 px-3"
+                    style={{ background: 'var(--cyber-cyan)', color: 'var(--cyber-bg-darkest)', fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    <span className="hidden sm:inline">New</span>
                   </Button>
                 </div>
               </div>
 
-              {/* Calendar Grid */}
-              <div className="flex-1 overflow-auto p-3 sm:p-6">
-                <div className="grid grid-cols-7 gap-px bg-neutral-800 border border-neutral-800 rounded-lg overflow-hidden min-w-[700px]">
-                  {/* Day headers */}
-                  {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => (
-                    <div key={day} className="bg-neutral-900 p-3 text-center">
-                      <span className="text-sm font-medium text-neutral-400">{day}</span>
+              {/* Calendar Grid — 7-column, works at 375px */}
+              <div className="flex-1 overflow-y-auto px-1 sm:px-4 py-2">
+                {/* Day headers */}
+                <div className="grid grid-cols-7">
+                  {["S", "M", "T", "W", "T", "F", "S"].map((day, i) => (
+                    <div
+                      key={i}
+                      className="text-center py-2"
+                      style={{
+                        fontFamily: '"Orbitron", sans-serif',
+                        fontSize: '0.7rem',
+                        textTransform: 'uppercase',
+                        color: 'var(--cyber-cyan)',
+                      }}
+                    >
+                      {day}
                     </div>
                   ))}
+                </div>
 
-                  {/* Calendar days */}
+                {/* Date cells */}
+                <div className="grid grid-cols-7" style={{ border: '1px solid var(--cyber-border)' }}>
                   {days.map((day, idx) => {
                     const dayAppointments = day ? getAppointmentsForDay(day) : []
-                    const isToday =
-                      day === new Date().getDate() &&
-                      currentDate.getMonth() === new Date().getMonth() &&
-                      currentDate.getFullYear() === new Date().getFullYear()
+                    const isToday = day === today.getDate() && isCurrentMonth
+                    const isSelected = day === selectedDay
 
                     return (
                       <div
                         key={idx}
-                        className={`bg-black min-h-[120px] p-2 ${day ? "hover:bg-neutral-900" : "bg-neutral-950"}`}
+                        onClick={() => day && setSelectedDay(day)}
+                        className={day ? "cursor-pointer" : ""}
+                        style={{
+                          height: '48px',
+                          padding: '2px 4px',
+                          borderRight: '1px solid var(--cyber-border)',
+                          borderBottom: '1px solid var(--cyber-border)',
+                          background: isSelected
+                            ? 'rgba(0,240,255,0.1)'
+                            : day
+                              ? 'transparent'
+                              : 'rgba(0,0,0,0.3)',
+                          position: 'relative',
+                          boxShadow: isToday ? 'inset 0 0 0 1px var(--cyber-cyan)' : 'none',
+                        }}
                       >
                         {day && (
                           <>
-                            <div
-                              className={`text-sm font-medium mb-2 ${
-                                isToday
-                                  ? "w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center"
-                                  : "text-neutral-400"
-                              }`}
+                            <span
+                              style={{
+                                fontFamily: '"JetBrains Mono", monospace',
+                                fontSize: '0.7rem',
+                                color: isToday
+                                  ? 'var(--cyber-cyan)'
+                                  : 'var(--cyber-text-primary)',
+                              }}
                             >
                               {day}
-                            </div>
-                            <div className="space-y-1">
-                              {dayAppointments.map((apt) => (
-                                <button
-                                  key={apt.id}
-                                  onClick={() => setSelectedAppointment(apt)}
-                                  className={`w-full text-left px-2 py-1 rounded text-xs ${apt.color} text-white hover:opacity-80 transition-opacity`}
-                                >
-                                  <div className="font-medium truncate">{apt.startTime}</div>
-                                  <div className="truncate">{apt.title}</div>
-                                </button>
-                              ))}
-                            </div>
+                            </span>
+                            {dayAppointments.length > 0 && (
+                              <div className="flex gap-0.5 mt-0.5 overflow-hidden">
+                                {dayAppointments.slice(0, 2).map((apt) => (
+                                  <div
+                                    key={apt.id}
+                                    className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${apt.color}`}
+                                  />
+                                ))}
+                                {dayAppointments.length > 2 && (
+                                  <span style={{ fontSize: '0.5rem', color: 'var(--cyber-text-muted)' }}>+{dayAppointments.length - 2}</span>
+                                )}
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
                     )
                   })}
                 </div>
+
+                {/* Selected day appointments */}
+                {selectedDay && (
+                  <div className="mt-4 px-1">
+                    <p
+                      className="mb-2"
+                      style={{
+                        fontFamily: '"Orbitron", sans-serif',
+                        fontSize: '0.65rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: 'var(--cyber-text-muted)',
+                      }}
+                    >
+                      <span style={{ color: 'var(--cyber-cyan)' }}>// </span>
+                      {currentDate.toLocaleDateString("en-US", { month: "long" })} {selectedDay}
+                    </p>
+
+                    {selectedDayAppointments.length === 0 ? (
+                      <p style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem', color: 'var(--cyber-text-muted)', padding: '12px 0' }}>
+                        No appointments
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedDayAppointments.map((apt) => (
+                          <button
+                            key={apt.id}
+                            onClick={() => setSelectedAppointment(apt)}
+                            className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded transition-colors"
+                            style={{
+                              background: 'var(--cyber-surface)',
+                              border: '1px solid var(--cyber-border)',
+                              minHeight: '44px',
+                            }}
+                          >
+                            <div className={`w-2 h-8 rounded-sm flex-shrink-0 ${apt.color}`} />
+                            <div className="min-w-0 flex-1">
+                              <p style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--cyber-text-primary)' }} className="truncate">
+                                {apt.title}
+                              </p>
+                              <p style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.65rem', color: 'var(--cyber-text-muted)' }}>
+                                {apt.allDay ? "All day" : `${apt.startTime} – ${apt.endTime}`} · {apt.contact}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
             // List View
             <div className="h-full flex flex-col">
-              {/* List Controls */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
-                <h2 className="text-xl font-semibold">Appointments</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3" style={{ borderBottom: '1px solid var(--cyber-border)' }}>
+                <h2 style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cyber-text-primary)' }}>Appointments</h2>
                 <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                    <Input placeholder="Search appointments..." className="pl-9 bg-neutral-900 border-neutral-800" />
+                  <div className="relative hidden sm:block">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--cyber-text-muted)' }} />
+                    <Input placeholder="Search..." className="pl-9" style={{ background: 'var(--cyber-bg-dark)', borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-primary)' }} />
                   </div>
-                  <Button variant="outline" size="sm" className="border-neutral-700 bg-transparent">
-                    <Filter className="w-4 h-4 mr-2" />
-                    Filters
-                  </Button>
-                  <Button onClick={() => setShowCreateModal(true)} className="bg-orange-500 hover:bg-orange-600">
-                    <Plus className="w-4 h-4 mr-2" />
+                  <Button
+                    onClick={() => setShowCreateModal(true)}
+                    className="h-8 px-3"
+                    style={{ background: 'var(--cyber-cyan)', color: 'var(--cyber-bg-darkest)', fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase' }}
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
                     New
                   </Button>
                 </div>
               </div>
 
-              {/* Appointments Table */}
               <div className="flex-1 overflow-auto">
-                <table className="w-full">
-                  <thead className="bg-neutral-900 sticky top-0">
+                {/* Mobile list */}
+                <div className="sm:hidden divide-y" style={{ borderColor: 'var(--cyber-border)' }}>
+                  {appointments.map((apt) => (
+                    <button
+                      key={apt.id}
+                      onClick={() => setSelectedAppointment(apt)}
+                      className="w-full text-left flex items-center gap-3 px-4 py-3 transition-colors"
+                      style={{ borderBottom: '1px solid var(--cyber-border)', minHeight: '44px' }}
+                    >
+                      <div className={`w-2 h-8 rounded-sm flex-shrink-0 ${apt.color}`} />
+                      <div className="min-w-0 flex-1">
+                        <p style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--cyber-text-primary)' }} className="truncate">{apt.title}</p>
+                        <p style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.65rem', color: 'var(--cyber-text-muted)' }}>
+                          {apt.date} · {apt.allDay ? "All day" : `${apt.startTime} – ${apt.endTime}`}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Desktop table */}
+                <table className="w-full hidden sm:table">
+                  <thead className="sticky top-0" style={{ background: 'var(--cyber-bg-dark)' }}>
                     <tr>
-                      <th className="text-left p-4 text-sm font-medium text-neutral-400">Date & Time</th>
-                      <th className="text-left p-4 text-sm font-medium text-neutral-400">Contact Name</th>
-                      <th className="text-left p-4 text-sm font-medium text-neutral-400">Type</th>
-                      <th className="text-left p-4 text-sm font-medium text-neutral-400">Assigned To</th>
-                      <th className="text-left p-4 text-sm font-medium text-neutral-400">Duration</th>
-                      <th className="text-left p-4 text-sm font-medium text-neutral-400">Status</th>
-                      <th className="text-left p-4 text-sm font-medium text-neutral-400">Actions</th>
+                      {["Date & Time", "Contact", "Type", "Assigned", "Duration", "Status", ""].map((h) => (
+                        <th key={h} className="text-left p-4" style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cyber-text-muted)' }}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {appointments.map((apt) => (
                       <tr
                         key={apt.id}
-                        className="border-b border-neutral-800 hover:bg-neutral-900 cursor-pointer"
+                        className="cursor-pointer transition-colors"
+                        style={{ borderBottom: '1px solid var(--cyber-border)' }}
                         onClick={() => setSelectedAppointment(apt)}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0,240,255,0.03)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                       >
                         <td className="p-4">
-                          <div className="text-sm">{apt.date}</div>
-                          <div className="text-xs text-neutral-500">
-                            {apt.startTime} - {apt.endTime}
-                          </div>
+                          <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'var(--cyber-text-primary)' }}>{apt.date}</div>
+                          <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', color: 'var(--cyber-text-muted)' }}>{apt.startTime} - {apt.endTime}</div>
                         </td>
-                        <td className="p-4 text-sm">{apt.contact}</td>
-                        <td className="p-4">
-                          <Badge className={`${apt.color} border-0`}>{apt.type}</Badge>
-                        </td>
-                        <td className="p-4 text-sm">{apt.assignedTo}</td>
-                        <td className="p-4 text-sm">{apt.allDay ? "All Day" : "1h"}</td>
-                        <td className="p-4">
-                          <Badge variant="outline" className="border-green-500 text-green-500">
-                            Scheduled
-                          </Badge>
-                        </td>
-                        <td className="p-4">
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </td>
+                        <td className="p-4" style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'var(--cyber-text-secondary)' }}>{apt.contact}</td>
+                        <td className="p-4"><Badge className={`${apt.color} border-0 text-white`}>{apt.type}</Badge></td>
+                        <td className="p-4" style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'var(--cyber-text-secondary)' }}>{apt.assignedTo}</td>
+                        <td className="p-4" style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'var(--cyber-text-secondary)' }}>{apt.allDay ? "All Day" : "1h"}</td>
+                        <td className="p-4"><Badge variant="outline" style={{ borderColor: 'var(--cyber-cyan)', color: 'var(--cyber-cyan)' }}>Scheduled</Badge></td>
+                        <td className="p-4"><Button variant="ghost" size="sm" style={{ color: 'var(--cyber-text-muted)' }}><MoreVertical className="w-4 h-4" /></Button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -443,53 +546,42 @@ export default function CalendarsPage() {
 
       {/* Appointment Detail Modal */}
       <Dialog open={!!selectedAppointment} onOpenChange={() => setSelectedAppointment(null)}>
-        <DialogContent className="bg-neutral-900 border-neutral-800 text-white max-w-2xl">
+        <DialogContent className="max-w-2xl" style={{ background: 'var(--cyber-bg-dark)', border: '1px solid var(--cyber-border)', color: 'var(--cyber-text-primary)' }}>
           <DialogHeader>
-            <DialogTitle className="text-xl">{selectedAppointment?.title}</DialogTitle>
-            <DialogDescription className="text-neutral-400">Appointment Details</DialogDescription>
+            <DialogTitle style={{ fontFamily: '"Orbitron", sans-serif', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{selectedAppointment?.title}</DialogTitle>
+            <DialogDescription style={{ color: 'var(--cyber-text-muted)' }}>Appointment Details</DialogDescription>
           </DialogHeader>
 
           {selectedAppointment && (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 text-sm">
-                <Clock className="w-4 h-4 text-neutral-500" />
-                <span>
-                  {selectedAppointment.date} • {selectedAppointment.startTime} - {selectedAppointment.endTime}
-                </span>
+              <div className="flex items-center gap-3" style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'var(--cyber-text-secondary)' }}>
+                <Clock className="w-4 h-4" style={{ color: 'var(--cyber-text-muted)' }} />
+                <span>{selectedAppointment.date} · {selectedAppointment.startTime} - {selectedAppointment.endTime}</span>
               </div>
-
-              <div className="flex items-center gap-3 text-sm">
-                <Users className="w-4 h-4 text-neutral-500" />
+              <div className="flex items-center gap-3" style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'var(--cyber-text-secondary)' }}>
+                <Users className="w-4 h-4" style={{ color: 'var(--cyber-text-muted)' }} />
                 <span>{selectedAppointment.contact}</span>
               </div>
-
-              <div className="flex items-center gap-3 text-sm">
-                <MapPin className="w-4 h-4 text-neutral-500" />
+              <div className="flex items-center gap-3" style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'var(--cyber-text-secondary)' }}>
+                <MapPin className="w-4 h-4" style={{ color: 'var(--cyber-text-muted)' }} />
                 <span>Virtual Meeting</span>
               </div>
-
-              <div className="pt-4 border-t border-neutral-800">
-                <h4 className="text-sm font-medium mb-2">Assigned To</h4>
-                <p className="text-sm text-neutral-400">{selectedAppointment.assignedTo}</p>
+              <div className="pt-4" style={{ borderTop: '1px solid var(--cyber-border)' }}>
+                <h4 style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--cyber-text-muted)', marginBottom: '8px' }}>Assigned To</h4>
+                <p style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'var(--cyber-text-secondary)' }}>{selectedAppointment.assignedTo}</p>
               </div>
-
-              <div className="pt-4 border-t border-neutral-800">
-                <h4 className="text-sm font-medium mb-2">Type</h4>
-                <Badge className={`${selectedAppointment.color} border-0`}>{selectedAppointment.type}</Badge>
+              <div className="pt-4" style={{ borderTop: '1px solid var(--cyber-border)' }}>
+                <h4 style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--cyber-text-muted)', marginBottom: '8px' }}>Type</h4>
+                <Badge className={`${selectedAppointment.color} border-0 text-white`}>{selectedAppointment.type}</Badge>
               </div>
-
               <div className="flex gap-2 pt-4">
-                <Button className="flex-1 bg-orange-500 hover:bg-orange-600">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit
+                <Button className="flex-1" style={{ background: 'var(--cyber-cyan)', color: 'var(--cyber-bg-darkest)' }}>
+                  <Edit className="w-4 h-4 mr-2" /> Edit
                 </Button>
-                <Button variant="outline" className="flex-1 border-neutral-700 bg-transparent">
+                <Button variant="outline" className="flex-1" style={{ borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-secondary)', background: 'transparent' }}>
                   Reschedule
                 </Button>
-                <Button
-                  variant="outline"
-                  className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white bg-transparent"
-                >
+                <Button variant="outline" style={{ borderColor: '#ef4444', color: '#ef4444', background: 'transparent' }}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
@@ -500,37 +592,35 @@ export default function CalendarsPage() {
 
       {/* Create Appointment Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="bg-neutral-900 border-neutral-800 text-white max-w-2xl">
+        <DialogContent className="max-w-2xl" style={{ background: 'var(--cyber-bg-dark)', border: '1px solid var(--cyber-border)', color: 'var(--cyber-text-primary)' }}>
           <DialogHeader>
-            <DialogTitle className="text-xl">Create New Appointment</DialogTitle>
-            <DialogDescription className="text-neutral-400">Schedule a new appointment</DialogDescription>
+            <DialogTitle style={{ fontFamily: '"Orbitron", sans-serif', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Create Appointment</DialogTitle>
+            <DialogDescription style={{ color: 'var(--cyber-text-muted)' }}>Schedule a new appointment</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Contact</label>
-              <Input placeholder="Search or select contact..." className="bg-black border-neutral-800" />
+              <label style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--cyber-text-muted)' }} className="mb-2 block">Contact</label>
+              <Input placeholder="Search or select contact..." style={{ background: 'var(--cyber-bg-darkest)', borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-primary)' }} />
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">Date</label>
-                <Input type="date" className="bg-black border-neutral-800" />
+                <label style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--cyber-text-muted)' }} className="mb-2 block">Date</label>
+                <Input type="date" style={{ background: 'var(--cyber-bg-darkest)', borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-primary)' }} />
               </div>
               <div>
-                <label className="text-sm font-medium mb-2 block">Time</label>
-                <Input type="time" className="bg-black border-neutral-800" />
+                <label style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--cyber-text-muted)' }} className="mb-2 block">Time</label>
+                <Input type="time" style={{ background: 'var(--cyber-bg-darkest)', borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-primary)' }} />
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">Duration</label>
+                <label style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--cyber-text-muted)' }} className="mb-2 block">Duration</label>
                 <Select>
-                  <SelectTrigger className="bg-black border-neutral-800">
+                  <SelectTrigger style={{ background: 'var(--cyber-bg-darkest)', borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-primary)' }}>
                     <SelectValue placeholder="Select duration" />
                   </SelectTrigger>
-                  <SelectContent className="bg-neutral-900 border-neutral-800">
+                  <SelectContent style={{ background: 'var(--cyber-bg-dark)', borderColor: 'var(--cyber-border)' }}>
                     <SelectItem value="30">30 minutes</SelectItem>
                     <SelectItem value="60">1 hour</SelectItem>
                     <SelectItem value="90">1.5 hours</SelectItem>
@@ -539,58 +629,46 @@ export default function CalendarsPage() {
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium mb-2 block">Type</label>
+                <label style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--cyber-text-muted)' }} className="mb-2 block">Type</label>
                 <Select>
-                  <SelectTrigger className="bg-black border-neutral-800">
+                  <SelectTrigger style={{ background: 'var(--cyber-bg-darkest)', borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-primary)' }}>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
-                  <SelectContent className="bg-neutral-900 border-neutral-800">
+                  <SelectContent style={{ background: 'var(--cyber-bg-dark)', borderColor: 'var(--cyber-border)' }}>
                     {appointmentTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.name}>
-                        {type.name}
-                      </SelectItem>
+                      <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-
             <div>
-              <label className="text-sm font-medium mb-2 block">Assigned To</label>
+              <label style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--cyber-text-muted)' }} className="mb-2 block">Assigned To</label>
               <Select>
-                <SelectTrigger className="bg-black border-neutral-800">
+                <SelectTrigger style={{ background: 'var(--cyber-bg-darkest)', borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-primary)' }}>
                   <SelectValue placeholder="Select user" />
                 </SelectTrigger>
-                <SelectContent className="bg-neutral-900 border-neutral-800">
+                <SelectContent style={{ background: 'var(--cyber-bg-dark)', borderColor: 'var(--cyber-border)' }}>
                   {users.map((user) => (
-                    <SelectItem key={user.id} value={user.name}>
-                      {user.name}
-                    </SelectItem>
+                    <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div>
-              <label className="text-sm font-medium mb-2 block">Location / Meeting Link</label>
-              <Input placeholder="Enter location or meeting URL..." className="bg-black border-neutral-800" />
+              <label style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--cyber-text-muted)' }} className="mb-2 block">Location / Meeting Link</label>
+              <Input placeholder="Enter location or meeting URL..." style={{ background: 'var(--cyber-bg-darkest)', borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-primary)' }} />
             </div>
-
             <div>
-              <label className="text-sm font-medium mb-2 block">Notes</label>
-              <Textarea
-                placeholder="Add notes about this appointment..."
-                className="bg-black border-neutral-800 min-h-[100px]"
-              />
+              <label style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--cyber-text-muted)' }} className="mb-2 block">Notes</label>
+              <Textarea placeholder="Add notes..." className="min-h-[100px]" style={{ background: 'var(--cyber-bg-darkest)', borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-primary)' }} />
             </div>
-
             <div className="flex gap-2 pt-4">
-              <Button onClick={() => setShowCreateModal(false)} variant="outline" className="flex-1 border-neutral-700">
+              <Button onClick={() => setShowCreateModal(false)} variant="outline" className="flex-1" style={{ borderColor: 'var(--cyber-border)', color: 'var(--cyber-text-secondary)', background: 'transparent' }}>
                 Cancel
               </Button>
-              <Button className="flex-1 bg-orange-500 hover:bg-orange-600">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Appointment
+              <Button className="flex-1" style={{ background: 'var(--cyber-cyan)', color: 'var(--cyber-bg-darkest)' }}>
+                <Plus className="w-4 h-4 mr-2" /> Create
               </Button>
             </div>
           </div>

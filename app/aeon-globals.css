@@ -735,3 +735,12 @@ body.aeon-custom-cursor * {
 .shell-main {
   background-color: var(--aeon-bg) !important;
 }
+
+/* ── Menu page nav items ── */
+.cyber-menu-item:hover {
+  color: var(--cyber-cyan) !important;
+  background: rgba(0, 240, 255, 0.03);
+}
+.cyber-menu-item:active {
+  background: rgba(0, 240, 255, 0.06);
+}
