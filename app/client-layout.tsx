@@ -40,7 +40,6 @@ import { useHapticFeedback } from "@/hooks/use-haptic-feedback"
 import { useDeviceCapabilities } from "@/hooks/use-device-capabilities"
 import { usePerformanceGovernor } from "@/hooks/use-performance-governor"
 import { getAnimationConfig } from "@/lib/animation-config"
-import { ThumbNavigation } from "@/components/thumb-navigation"
 import MobileBottomNav from "@/components/MobileBottomNav"
 import DrawerNav from "@/components/DrawerNav"
 
@@ -213,7 +212,6 @@ export default function ClientLayout({
   const [mounted, setMounted] = useState(false)
   const [headerDate, setHeaderDate] = useState("")
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [sidebarHoverMode, setSidebarHoverMode] = useState(false)
   const [sidebarPinned, setSidebarPinned] = useState(false)
@@ -279,7 +277,6 @@ export default function ClientLayout({
 
   // Close mobile sidebar on route change
   useEffect(() => {
-    setMobileSidebarOpen(false)
     setDrawerOpen(false)
   }, [pathname])
 
@@ -329,21 +326,45 @@ export default function ClientLayout({
 
   return (
     <ScrollProvider>
-      {/* Mobile backdrop — click to close sidebar */}
-      {mobileSidebarOpen && (
-        <div
-          className="shell-backdrop"
-          onClick={() => setMobileSidebarOpen(false)}
-        />
-      )}
+      {/* Mobile shell — visible only below md */}
+      <div className="md:hidden flex min-h-screen flex-col" style={{ background: "var(--cyber-bg-darkest)" }}>
+        <header className="shell-topbar" style={{ background: "var(--cyber-bg-dark)", borderBottom: "1px solid var(--cyber-border)" }}>
+          <button
+            className="shell-menu-btn cyber-btn"
+            style={{ padding: "6px", minHeight: "auto", border: "1px solid var(--cyber-border)" }}
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="w-4 h-4" />
+          </button>
 
-      <div className="shell-layout">
-        {/* ── SIDEBAR ──
-            Mobile: off-screen by default, slides in via .is-open
-            Desktop (≥768px): always visible, fixed at --sidebar-width */}
+          <span className="shell-brand" style={{ fontFamily: '"Orbitron", sans-serif', color: "var(--cyber-cyan)", textShadow: "0 0 12px rgba(0, 240, 255, 0.35)" }}>
+            AEON DIAL
+          </span>
+
+          <div className="ml-auto flex items-center gap-3">
+            <SignedIn>
+              <ClerkShellControls compact />
+            </SignedIn>
+            <div className="cyber-badge cyber-badge-green" style={{ fontSize: "0.6rem" }}>
+              <span>Online</span>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto pb-24" style={{ background: "var(--cyber-bg-darkest)" }}>
+          {children}
+        </main>
+
+        <DrawerNav isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
+        <MobileBottomNav />
+        <FloatingDialer />
+      </div>
+
+      {/* Desktop shell — hidden on mobile, visible at md+ */}
+      <div className="shell-layout hidden md:block">
         <aside className={[
           "shell-sidebar",
-          mobileSidebarOpen ? "is-open" : "",
           sidebarHoverMode ? "hover-mode" : "",
           sidebarPinned ? "pinned" : "",
         ].filter(Boolean).join(" ")}>
@@ -383,7 +404,7 @@ export default function ClientLayout({
                 <button
                   className="shell-sidebar-close cyber-btn h-8 w-8 items-center justify-center"
                   style={{ padding: '4px', minHeight: 'auto', border: '1px solid var(--cyber-border)' }}
-                  onClick={() => setMobileSidebarOpen(false)}
+                  onClick={() => setDrawerOpen(false)}
                   aria-label="Close menu"
                 >
                   <X className="w-4 h-4" />
@@ -497,16 +518,12 @@ export default function ClientLayout({
           </div>
         </aside>
 
-        {/* ── BODY (topbar + main) ──
-            Mobile: full width
-            Desktop (≥768px): offset right by --sidebar-width */}
         <div className={`shell-body${sidebarHoverMode ? " sidebar-hover-mode" : ""}`}>
           <header className="shell-topbar" style={{ background: 'var(--cyber-bg-dark)', borderBottom: '1px solid var(--cyber-border)' }}>
-            {/* Hamburger — CSS: visible on mobile, hidden on desktop */}
             <button
               className="shell-menu-btn cyber-btn"
               style={{ padding: '6px', minHeight: 'auto', border: '1px solid var(--cyber-border)' }}
-              onClick={() => { setMobileSidebarOpen(true); setDrawerOpen(true) }}
+              onClick={() => setDrawerOpen(true)}
               aria-label="Open menu"
             >
               <Menu className="w-4 h-4" />
@@ -542,14 +559,7 @@ export default function ClientLayout({
           <main className="flex-1 overflow-y-auto shell-main" style={{ background: 'var(--cyber-bg-darkest)' }}>{children}</main>
         </div>
 
-        {/* Thumb nav — CSS: visible on mobile, hidden on desktop */}
-        <div className="shell-thumb-nav-wrap">
-          <ThumbNavigation navigation={navigation.filter((item) => !item.submenu)} />
-        </div>
-
         <FloatingDialer />
-        <DrawerNav isOpen={drawerOpen} onClose={() => { setDrawerOpen(false); setMobileSidebarOpen(false) }} />
-        <MobileBottomNav />
       </div>
     </ScrollProvider>
   )

@@ -3,9 +3,6 @@ import type React from "react"
 import type { Metadata, Viewport } from "next"
 import {
   ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  SignedOut,
 } from "@clerk/nextjs"
 import { Inter } from "next/font/google"
 import "./globals.css"
@@ -58,22 +55,6 @@ export default function RootLayout({
           signInFallbackRedirectUrl="/dialer"
           signUpFallbackRedirectUrl="/dialer"
         >
-          <header className="fixed right-2 top-2 sm:right-4 sm:top-4 z-50">
-            <SignedOut>
-              <div className="flex items-center gap-2">
-                <SignInButton>
-                  <button className="cyber-btn" style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}>
-                    Sign in
-                  </button>
-                </SignInButton>
-                <SignUpButton>
-                  <button className="cyber-btn cyber-btn-magenta" style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}>
-                    Sign up
-                  </button>
-                </SignUpButton>
-              </div>
-            </SignedOut>
-          </header>
           <AeonCursor />
           <ClientLayout>{children}</ClientLayout>
         </ClerkProvider>
