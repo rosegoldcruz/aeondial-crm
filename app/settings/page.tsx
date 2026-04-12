@@ -1,10 +1,29 @@
 "use client"
 
-import { Users, Phone, Plug, Bell, CreditCard, User, Shield, SettingsIcon, ChevronRight } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Users, Phone, Plug, Bell, CreditCard, User, Shield, SettingsIcon, ChevronRight, PanelLeft } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 
 export default function SettingsPage() {
+  const [sidebarHoverMode, setSidebarHoverMode] = useState(false)
+
+  useEffect(() => {
+    try { setSidebarHoverMode(localStorage.getItem("sidebar_hover_mode") === "true") } catch {}
+  }, [])
+
+  const toggleSidebarHoverMode = () => {
+    const next = !sidebarHoverMode
+    setSidebarHoverMode(next)
+    try {
+      localStorage.setItem("sidebar_hover_mode", String(next))
+      // If disabling hover mode, also clear the pin so sidebar goes back to always-open
+      if (!next) localStorage.setItem("sidebar_pinned", "false")
+      // Force a page reload so client-layout re-reads localStorage
+      window.location.reload()
+    } catch {}
+  }
+
   const settingsSections = [
     {
       title: "Team Management",
@@ -207,6 +226,55 @@ export default function SettingsPage() {
               </button>
             </Link>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Sidebar Appearance */}
+      <Card className="bg-[#1a1a1a] border-neutral-800">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-cyan-500/10 rounded-lg">
+              <PanelLeft className="w-5 h-5 text-cyan-500" />
+            </div>
+            <div>
+              <CardTitle className="text-white text-lg">Sidebar Behavior</CardTitle>
+              <CardDescription className="text-gray-400">Control how the navigation sidebar opens and closes</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between py-3 border-b border-neutral-800">
+            <div>
+              <p className="text-sm font-medium text-white">Hover to Open</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Sidebar collapses to icon rail. Expands when your cursor enters it.
+                Use the pin button inside the sidebar to lock it open.
+              </p>
+            </div>
+            <button
+              onClick={toggleSidebarHoverMode}
+              className="relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none"
+              style={{
+                background: sidebarHoverMode ? 'var(--hud-accent)' : 'rgba(255,255,255,0.1)',
+                border: '1px solid',
+                borderColor: sidebarHoverMode ? 'var(--hud-accent)' : 'rgba(255,255,255,0.15)',
+              }}
+              role="switch"
+              aria-checked={sidebarHoverMode}
+              aria-label="Toggle sidebar hover mode"
+            >
+              <span
+                className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-200"
+                style={{
+                  background: sidebarHoverMode ? '#020408' : 'rgba(255,255,255,0.5)',
+                  transform: sidebarHoverMode ? 'translateX(20px)' : 'translateX(0)',
+                }}
+              />
+            </button>
+          </div>
+          <p className="text-xs text-gray-600 mt-3">
+            // Changes take effect immediately. Page will reload to apply the new layout.
+          </p>
         </CardContent>
       </Card>
 

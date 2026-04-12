@@ -20,6 +20,8 @@ import {
   Calendar,
   Building2,
   X,
+  Pin,
+  PinOff,
 } from "lucide-react"
 import {
   OrganizationSwitcher,
@@ -213,6 +215,8 @@ export default function ClientLayout({
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [sidebarHoverMode, setSidebarHoverMode] = useState(false)
+  const [sidebarPinned, setSidebarPinned] = useState(false)
   const auroraRef = useRef<HTMLDivElement>(null)
   const navItemsRef = useRef<{ [key: string]: HTMLDivElement | null }>({})
 
@@ -234,6 +238,14 @@ export default function ClientLayout({
         day: "numeric",
       }).format(new Date()),
     )
+  }, [])
+
+  // Load sidebar preferences from localStorage
+  useEffect(() => {
+    try {
+      setSidebarHoverMode(localStorage.getItem("sidebar_hover_mode") === "true")
+      setSidebarPinned(localStorage.getItem("sidebar_pinned") === "true")
+    } catch {}
   }, [])
 
   useEffect(() => {
@@ -301,6 +313,12 @@ export default function ClientLayout({
     }
   }
 
+  const toggleSidebarPin = () => {
+    const next = !sidebarPinned
+    setSidebarPinned(next)
+    try { localStorage.setItem("sidebar_pinned", String(next)) } catch {}
+  }
+
   if (isAuthPage || isHomePage) {
     return (
       <ScrollProvider>
@@ -323,7 +341,12 @@ export default function ClientLayout({
         {/* ── SIDEBAR ──
             Mobile: off-screen by default, slides in via .is-open
             Desktop (≥768px): always visible, fixed at --sidebar-width */}
-        <aside className={`shell-sidebar${mobileSidebarOpen ? " is-open" : ""}`}>
+        <aside className={[
+          "shell-sidebar",
+          mobileSidebarOpen ? "is-open" : "",
+          sidebarHoverMode ? "hover-mode" : "",
+          sidebarPinned ? "pinned" : "",
+        ].filter(Boolean).join(" ")}>
           {animConfig.enableGlow && (
             <div
               ref={auroraRef}
@@ -340,23 +363,36 @@ export default function ClientLayout({
           <div className="relative z-10 flex flex-col h-full">
             {/* Logo row */}
             <div className="flex items-center justify-between h-14 px-4 border-b flex-shrink-0" style={{ borderColor: 'var(--cyber-border)', background: 'var(--cyber-bg-dark)' }}>
-              <div>
+              <div className="sidebar-logo-text overflow-hidden transition-all duration-200">
                 <h1 className="text-lg font-bold" style={{ fontFamily: '"Orbitron", sans-serif', color: 'var(--cyber-cyan)', animation: 'neonFlicker 3s infinite', letterSpacing: '0.1em' }}>AEON DIAL</h1>
                 <p className="text-[10px]" style={{ fontFamily: '"JetBrains Mono", monospace', color: 'var(--cyber-text-muted)' }}>v1.0.0</p>
               </div>
-              {/* Close button — CSS: visible on mobile, hidden on desktop */}
-              <button
-                className="shell-sidebar-close cyber-btn h-8 w-8 items-center justify-center"
-                style={{ padding: '4px', minHeight: 'auto', border: '1px solid var(--cyber-border)' }}
-                onClick={() => setMobileSidebarOpen(false)}
-                aria-label="Close menu"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {/* Pin button — desktop hover-mode only */}
+                {sidebarHoverMode && (
+                  <button
+                    className={`sidebar-pin-btn${sidebarPinned ? " active" : ""}`}
+                    onClick={toggleSidebarPin}
+                    title={sidebarPinned ? "Unpin sidebar" : "Pin sidebar open"}
+                    aria-label={sidebarPinned ? "Unpin sidebar" : "Pin sidebar open"}
+                  >
+                    {sidebarPinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+                  </button>
+                )}
+                {/* Close button — CSS: visible on mobile, hidden on desktop */}
+                <button
+                  className="shell-sidebar-close cyber-btn h-8 w-8 items-center justify-center"
+                  style={{ padding: '4px', minHeight: 'auto', border: '1px solid var(--cyber-border)' }}
+                  onClick={() => setMobileSidebarOpen(false)}
+                  aria-label="Close menu"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            {/* Nav */}
-            <nav className="px-1 py-2 space-y-0.5 flex-1 overflow-y-auto">
+            {/* Nav — overscroll-contain keeps wheel events in the sidebar */}
+            <nav className="px-1 py-2 space-y-0.5 flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain', minHeight: 0 }}>
               {navigation.map((item) => (
                 <div
                   key={item.name}
@@ -386,11 +422,11 @@ export default function ClientLayout({
                   >
                     <div className="relative flex items-center gap-2">
                       <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>{item.name}</span>
+                      <span className="sidebar-label transition-all duration-200">{item.name}</span>
                     </div>
                     {item.submenu && (
                       <ChevronDown
-                        className={`w-3 h-3 transition-transform ml-auto ${
+                        className={`sidebar-chevron w-3 h-3 transition-transform ml-auto ${
                           expandedMenus.includes(item.name) ? "rotate-180" : ""
                         }`}
                       />
@@ -398,7 +434,7 @@ export default function ClientLayout({
                   </Link>
 
                   {item.submenu && expandedMenus.includes(item.name) && (
-                    <div className="ml-5 mt-0.5 space-y-0.5">
+                    <div className="sidebar-submenu ml-5 mt-0.5 space-y-0.5">
                       {item.submenu.map((subitem) => (
                         <Link
                           key={subitem.href}
@@ -464,7 +500,7 @@ export default function ClientLayout({
         {/* ── BODY (topbar + main) ──
             Mobile: full width
             Desktop (≥768px): offset right by --sidebar-width */}
-        <div className="shell-body">
+        <div className={`shell-body${sidebarHoverMode ? " sidebar-hover-mode" : ""}`}>
           <header className="shell-topbar" style={{ background: 'var(--cyber-bg-dark)', borderBottom: '1px solid var(--cyber-border)' }}>
             {/* Hamburger — CSS: visible on mobile, hidden on desktop */}
             <button

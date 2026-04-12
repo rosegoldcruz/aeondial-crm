@@ -35,6 +35,7 @@
 
   /* ── Shell layout ── */
   --sidebar-width: 240px;
+  --sidebar-collapsed-width: 52px;
   /* Breakpoint reference (cannot be used inside @media conditions — used in @media (min-width: 768px) below) */
   --bp-desktop: 768px;
 }
@@ -432,12 +433,15 @@
   width: var(--sidebar-width);
   z-index: 20;
   transform: translateX(-100%);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), width 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   background: var(--aeon-bg2);
   border-right: 1px solid var(--aeon-border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* overflow:clip clips visual overflow without creating a scroll container,
+     so wheel events still reach the scrollable <nav> inside */
+  overflow: clip;
+  overflow-clip-margin: 0px;
 }
 
 /* Mobile: sidebar slides in when .is-open */
@@ -559,6 +563,58 @@
   /* Backdrop never visible on desktop */
   .shell-backdrop {
     display: none;
+  }
+
+  /* ── HOVER MODE: sidebar collapses to icon rail, expands on hover ── */
+  /* Activated when <aside> has .hover-mode class */
+  .shell-sidebar.hover-mode {
+    width: var(--sidebar-collapsed-width, 52px);
+    transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .shell-sidebar.hover-mode:hover,
+  .shell-sidebar.hover-mode.pinned {
+    width: var(--sidebar-width);
+    box-shadow: 4px 0 32px rgba(0, 229, 255, 0.06);
+  }
+
+  /* In collapsed state: hide text labels and chevrons, show only icons */
+  .shell-sidebar.hover-mode:not(:hover):not(.pinned) .sidebar-label,
+  .shell-sidebar.hover-mode:not(:hover):not(.pinned) .sidebar-chevron,
+  .shell-sidebar.hover-mode:not(:hover):not(.pinned) .sidebar-submenu,
+  .shell-sidebar.hover-mode:not(:hover):not(.pinned) .shell-date,
+  .shell-sidebar.hover-mode:not(:hover):not(.pinned) .sidebar-logo-text {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Body tight against collapsed sidebar */
+  .shell-body.sidebar-hover-mode {
+    margin-left: var(--sidebar-collapsed-width, 52px);
+    width: calc(100% - var(--sidebar-collapsed-width, 52px));
+    transition: margin-left 0.22s cubic-bezier(0.16, 1, 0.3, 1), width 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Pin button */
+  .sidebar-pin-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--aeon-border);
+    background: transparent;
+    color: var(--aeon-text-dim);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .sidebar-pin-btn:hover,
+  .sidebar-pin-btn.active {
+    color: var(--hud-accent);
+    border-color: var(--hud-accent);
   }
 }
 
