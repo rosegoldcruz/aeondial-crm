@@ -3,79 +3,79 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Shadcn design tokens for light mode - wrapped channel values in hsl() */
+/* Shadcn design tokens — CYBERPUNK OVERRIDE */
 :root {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(0 0% 3.9%);
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(0 0% 3.9%);
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(0 0% 3.9%);
-  --primary: hsl(0 0% 9%);
-  --primary-foreground: hsl(0 0% 98%);
-  --secondary: hsl(0 0% 96.1%);
-  --secondary-foreground: hsl(0 0% 9%);
-  --muted: hsl(0 0% 96.1%);
-  --muted-foreground: hsl(0 0% 45.1%);
-  --accent: hsl(0 0% 96.1%);
-  --accent-foreground: hsl(0 0% 9%);
-  --destructive: hsl(0 84.2% 60.2%);
-  --destructive-foreground: hsl(0 0% 98%);
-  --border: hsl(0 0% 89.8%);
-  --input: hsl(0 0% 89.8%);
-  --ring: hsl(0 0% 3.9%);
-  --chart-1: hsl(12 76% 61%);
-  --chart-2: hsl(173 58% 39%);
-  --chart-3: hsl(197 37% 24%);
-  --chart-4: hsl(43 74% 66%);
-  --chart-5: hsl(27 87% 67%);
-  --radius: 0.5rem;
-  --sidebar-background: hsl(0 0% 98%);
-  --sidebar-foreground: hsl(240 5.3% 26.1%);
-  --sidebar-primary: hsl(240 5.9% 10%);
-  --sidebar-primary-foreground: hsl(0 0% 98%);
-  --sidebar-accent: hsl(240 4.8% 95.9%);
-  --sidebar-accent-foreground: hsl(240 5.9% 10%);
-  --sidebar-border: hsl(220 13% 91%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --font-sans: "JetBrains Mono", "Share Tech Mono", monospace;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --background: #020408;
+  --foreground: #e8f4f8;
+  --card: #060d14;
+  --card-foreground: #e8f4f8;
+  --popover: #060d14;
+  --popover-foreground: #e8f4f8;
+  --primary: #00e5ff;
+  --primary-foreground: #020408;
+  --secondary: #08121c;
+  --secondary-foreground: #e8f4f8;
+  --muted: #08121c;
+  --muted-foreground: rgba(232, 244, 248, 0.4);
+  --accent: #08121c;
+  --accent-foreground: #00e5ff;
+  --destructive: #ff3c3c;
+  --destructive-foreground: #e8f4f8;
+  --border: rgba(0, 229, 255, 0.1);
+  --input: rgba(0, 229, 255, 0.1);
+  --ring: #00e5ff;
+  --chart-1: #00e5ff;
+  --chart-2: #00ff9d;
+  --chart-3: #ff3cac;
+  --chart-4: #ffb800;
+  --chart-5: #ff3c3c;
+  --radius: 0rem;
+  --sidebar-background: #060d14;
+  --sidebar-foreground: rgba(232, 244, 248, 0.4);
+  --sidebar-primary: #00e5ff;
+  --sidebar-primary-foreground: #020408;
+  --sidebar-accent: rgba(0, 229, 255, 0.06);
+  --sidebar-accent-foreground: #00e5ff;
+  --sidebar-border: rgba(0, 229, 255, 0.1);
+  --sidebar-ring: #00e5ff;
 }
 
-/* Shadcn design tokens for dark mode - wrapped channel values in hsl() */
+/* Dark mode uses same tokens */
 .dark {
-  --background: hsl(0 0% 0%);
-  --foreground: hsl(0 0% 98%);
-  --card: hsl(0 0% 7%);
-  --card-foreground: hsl(0 0% 98%);
-  --popover: hsl(0 0% 3.9%);
-  --popover-foreground: hsl(0 0% 98%);
-  --primary: hsl(0 0% 98%);
-  --primary-foreground: hsl(0 0% 9%);
-  --secondary: hsl(0 0% 10%);
-  --secondary-foreground: hsl(0 0% 98%);
-  --muted: hsl(0 0% 10%);
-  --muted-foreground: hsl(0 0% 63.9%);
-  --accent: hsl(0 0% 10%);
-  --accent-foreground: hsl(0 0% 98%);
-  --destructive: hsl(0 62.8% 30.6%);
-  --destructive-foreground: hsl(0 0% 98%);
-  --border: hsl(0 0% 14.9%);
-  --input: hsl(0 0% 14.9%);
-  --ring: hsl(0 0% 83.1%);
-  --chart-1: hsl(220 70% 50%);
-  --chart-2: hsl(160 60% 45%);
-  --chart-3: hsl(30 80% 55%);
-  --chart-4: hsl(280 65% 60%);
-  --chart-5: hsl(340 75% 55%);
-  --sidebar-background: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --background: #020408;
+  --foreground: #e8f4f8;
+  --card: #060d14;
+  --card-foreground: #e8f4f8;
+  --popover: #060d14;
+  --popover-foreground: #e8f4f8;
+  --primary: #00e5ff;
+  --primary-foreground: #020408;
+  --secondary: #08121c;
+  --secondary-foreground: #e8f4f8;
+  --muted: #08121c;
+  --muted-foreground: rgba(232, 244, 248, 0.4);
+  --accent: #08121c;
+  --accent-foreground: #00e5ff;
+  --destructive: #ff3c3c;
+  --destructive-foreground: #e8f4f8;
+  --border: rgba(0, 229, 255, 0.1);
+  --input: rgba(0, 229, 255, 0.1);
+  --ring: #00e5ff;
+  --chart-1: #00e5ff;
+  --chart-2: #00ff9d;
+  --chart-3: #ff3cac;
+  --chart-4: #ffb800;
+  --chart-5: #ff3c3c;
+  --sidebar-background: #060d14;
+  --sidebar-foreground: rgba(232, 244, 248, 0.4);
+  --sidebar-primary: #00e5ff;
+  --sidebar-primary-foreground: #020408;
+  --sidebar-accent: rgba(0, 229, 255, 0.06);
+  --sidebar-accent-foreground: #00e5ff;
+  --sidebar-border: rgba(0, 229, 255, 0.1);
+  --sidebar-ring: #00e5ff;
 }
 
 /* Tailwind v4 @theme syntax for semantic design tokens */
@@ -117,38 +117,14 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Cyberpunk design system tokens */
-  --color-background: #0a0a0f;
-  --color-surface: rgba(20, 20, 35, 0.8);
-  --color-surfaceSoft: #12121a;
-  --color-surfaceHover: rgba(30, 30, 50, 0.9);
-  --color-cyber-cyan: #00f0ff;
-  --color-cyber-cyanDim: #00a8b3;
-  --color-cyber-magenta: #ff00ff;
-  --color-cyber-magentaDim: #b300b3;
-  --color-cyber-yellow: #ffe600;
-  --color-cyber-yellowDim: #b3a200;
-  --color-cyber-red: #ff0044;
-  --color-cyber-green: #00ff66;
-  --color-bgDarkest: #0a0a0f;
-  --color-bgDark: #0d0d14;
-  --color-bgMedium: #12121a;
-  --color-bgLight: #1a1a25;
-  --color-bgLighter: #252535;
-  --color-borderSubtle: rgba(0,240,255,0.2);
-  --color-borderHover: rgba(0,240,255,0.4);
-  --color-borderFocus: rgba(0,240,255,0.8);
-  --color-textPrimary: #e0e0e0;
-  --color-textSecondary: #a0a0a0;
-  --color-textMuted: #606070;
-  --shadow-cyberSm: 0 0 5px rgba(0,240,255,0.5);
-  --shadow-cyberMd: 0 0 10px rgba(0,240,255,0.5), 0 0 20px rgba(0,240,255,0.5);
-  --shadow-cyberLg: 0 0 10px rgba(0,240,255,0.5), 0 0 30px rgba(0,240,255,0.5), 0 0 50px rgba(0,240,255,0.5);
-  --shadow-cyberMagenta: 0 0 10px rgba(255,0,255,0.5), 0 0 20px rgba(255,0,255,0.5);
-  --shadow-cyberYellow: 0 0 10px rgba(255,230,0,0.5), 0 0 20px rgba(255,230,0,0.5);
-  --shadow-cyberInset: inset 0 0 20px rgba(0,240,255,0.05);
-  --font-mono: "JetBrains Mono", "Fira Code", monospace;
-  --font-display: "Orbitron", "Rajdhani", sans-serif;
+  /* Cyberpunk extended palette */
+  --color-cyber-cyan: #00e5ff;
+  --color-cyber-magenta: #ff3cac;
+  --color-cyber-green: #00ff9d;
+  --color-cyber-yellow: #ffb800;
+  --color-cyber-red: #ff3c3c;
+  --font-mono: "JetBrains Mono", "Share Tech Mono", monospace;
+  --font-display: "Syncopate", "Orbitron", sans-serif;
 }
 
 @layer base {

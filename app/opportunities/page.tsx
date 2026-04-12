@@ -57,7 +57,7 @@ export default function OpportunitiesPage() {
   const [selectedOpportunity, setSelectedOpportunity] = useState<typeof sampleOpportunity | null>(null)
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="text-white">
       {/* Header */}
       <div className="border-b border-neutral-800 bg-neutral-900/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="p-6">

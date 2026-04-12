@@ -172,16 +172,21 @@ function ClerkShellControls({ compact = false }: { compact?: boolean }) {
         <div
           className={
             compact
-              ? "flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-100"
-              : "hidden xl:flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100"
+              ? "flex items-center gap-2 px-2 py-1 text-[11px]"
+              : "hidden xl:flex items-center gap-2 px-3 py-2 text-xs"
           }
+          style={{
+            border: '1px solid rgba(255, 184, 0, 0.25)',
+            background: 'rgba(255, 184, 0, 0.08)',
+            color: '#ffb800',
+          }}
         >
-          <Building2 className="h-3.5 w-3.5 text-amber-300" />
+          <Building2 className="h-3.5 w-3.5" style={{ color: '#ffb800' }} />
           <span>No active organization selected</span>
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-neutral-800 bg-neutral-950/80 px-1.5 py-1 shadow-[0_0_24px_rgba(0,0,0,0.25)] backdrop-blur">
+      <div style={{ border: '1px solid var(--aeon-border)', background: 'var(--aeon-bg2)', borderRadius: '4px' }} className="px-1.5 py-1 backdrop-blur">
         <OrganizationSwitcher
           afterSelectOrganizationUrl={syncUrl}
           afterCreateOrganizationUrl={syncUrl}
@@ -190,7 +195,7 @@ function ClerkShellControls({ compact = false }: { compact?: boolean }) {
         />
       </div>
 
-      <div className="rounded-full border border-neutral-800 bg-neutral-950/80 p-1 shadow-[0_0_24px_rgba(0,0,0,0.25)] backdrop-blur">
+      <div style={{ border: '1px solid var(--aeon-border)', background: 'var(--aeon-bg2)', borderRadius: '50%' }} className="p-1 backdrop-blur">
         <UserButton afterSignOutUrl="/" />
       </div>
     </div>
@@ -325,7 +330,7 @@ export default function ClientLayout({
               className="absolute inset-0 pointer-events-none opacity-30"
               style={{
                 background:
-                  "radial-gradient(circle at 50% 50%, rgba(249, 115, 22, 0.3) 0%, transparent 70%)",
+                  "radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.2) 0%, transparent 70%)",
                 mixBlendMode: "screen",
                 filter: animConfig.enableBlur ? "blur(40px)" : "blur(20px)",
               }}
