@@ -5,6 +5,7 @@
    only apply to elements that use .aeon-* classes.
    ============================================================ */
 
+@import '../styles/cyberpunk.css';
 @import url('https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Share+Tech+Mono&display=swap');
 
 /* ── TOKENS ── */
@@ -31,6 +32,11 @@
   --aeon-danger:      #ff3c3c;
   --aeon-font-mono:   'Share Tech Mono', monospace;
   --aeon-font-display:'Syncopate', sans-serif;
+
+  /* ── Shell layout ── */
+  --sidebar-width: 240px;
+  /* Breakpoint reference (cannot be used inside @media conditions — used in @media (min-width: 768px) below) */
+  --bp-desktop: 768px;
 }
 
 /* ── GLOBAL RESET FOR SHELL ── */
@@ -395,10 +401,172 @@
 .aeon-badge.live  { background: rgba(255,60,172,.2);  color: var(--aeon-accent2); animation: aeon-blink 1.5s infinite; }
 
 /* ═══════════════════════════════════════════════════════════════════
+   MOBILE-FIRST SHELL LAYOUT
+   Base styles target mobile (<768px). Desktop overrides at 768px
+   (= var(--bp-desktop) — CSS custom properties cannot be used in
+   @media conditions, so the value is hardcoded below).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Backdrop (mobile sidebar overlay) ── */
+.shell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+/* ── Outer wrapper — mobile: single column ── */
+.shell-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--aeon-bg);
+}
+
+/* ── Sidebar — off-screen by default (mobile) ── */
+.shell-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--sidebar-width);
+  z-index: 20;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--aeon-bg2);
+  border-right: 1px solid var(--aeon-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Mobile: sidebar slides in when .is-open */
+.shell-sidebar.is-open {
+  transform: translateX(0);
+}
+
+/* Close button — visible on mobile only */
+.shell-sidebar-close {
+  display: flex;
+}
+
+/* ── Body — full width on mobile ── */
+.shell-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+
+/* ── Topbar ── */
+.shell-topbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--aeon-bg2);
+  border-bottom: 1px solid var(--aeon-border);
+  flex-shrink: 0;
+}
+
+/* Hamburger — visible on mobile only */
+.shell-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--aeon-text-dim);
+  padding: 6px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.shell-menu-btn:hover { color: var(--aeon-accent); }
+
+/* Brand text — visible on mobile only */
+.shell-brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--aeon-accent);
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Date — hidden on mobile, shown on desktop */
+.shell-date {
+  display: none;
+}
+
+/* ── Main content — bottom padding on mobile for thumb nav ── */
+.shell-main {
+  padding-bottom: 6rem;
+}
+
+/* ── Thumb nav wrapper — visible on mobile, hidden on desktop ── */
+.shell-thumb-nav-wrap {
+  display: block;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DESKTOP OVERRIDES  ≥ 768px  (= var(--bp-desktop))
+   ══════════════════════════════════════════════════════════════ */
+@media (min-width: 768px) {
+  /* Sidebar always visible, transform reset */
+  .shell-sidebar {
+    transform: translateX(0);
+  }
+
+  /* Close button hidden on desktop */
+  .shell-sidebar-close {
+    display: none;
+  }
+
+  /* Body offset by sidebar width */
+  .shell-body {
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
+  }
+
+  /* Hamburger hidden on desktop */
+  .shell-menu-btn {
+    display: none;
+  }
+
+  /* Brand hidden on desktop (full logo is in sidebar) */
+  .shell-brand {
+    display: none;
+  }
+
+  /* Date visible on desktop */
+  .shell-date {
+    display: block;
+  }
+
+  /* No extra bottom padding — no thumb nav */
+  .shell-main {
+    padding-bottom: 0;
+  }
+
+  /* Thumb nav hidden on desktop */
+  .shell-thumb-nav-wrap {
+    display: none;
+  }
+
+  /* Backdrop never visible on desktop */
+  .shell-backdrop {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    CLIENTLAYOUT THEME OVERRIDES
-   Targets ClientLayout's existing Tailwind class names.
-   VISUAL PROPERTIES ONLY — display, flex, grid, width, height,
-   overflow, z-index, position, padding, margin, gap are never touched.
+   VISUAL PROPERTIES ONLY — color, background, border, shadow, glow.
+   Layout properties (display, flex, grid, position, width, height,
+   overflow, z-index, padding, margin, gap) are owned by .shell-* rules.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Body background ── */
@@ -412,122 +580,105 @@ body.aeon-custom-cursor * {
   cursor: none !important;
 }
 
-/* ── Sidebar (motion.aside renders as <aside>) ── */
-aside {
+/* ── Sidebar (.shell-sidebar renders as <aside>) ── */
+.shell-sidebar {
   background-color: var(--aeon-bg2) !important;
   border-color: var(--aeon-border) !important;
 }
 
 /* Sidebar internal dividers */
-aside .border-b,
-aside .border-t {
+.shell-sidebar .border-b,
+.shell-sidebar .border-t {
   border-color: var(--aeon-border) !important;
 }
 
-/* Sidebar brand / logo text (text-orange-500) */
-aside .text-orange-500 {
+/* Sidebar brand / logo text */
+.shell-sidebar .text-orange-500 {
   color: var(--aeon-accent) !important;
   text-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
 }
 
 /* Sidebar version / muted text */
-aside .text-neutral-500 {
+.shell-sidebar .text-neutral-500 {
   color: var(--aeon-text-muted) !important;
 }
 
 /* Nav font */
-aside nav {
+.shell-sidebar nav {
   font-family: var(--aeon-font-mono);
 }
 
 /* Nav item — inactive text */
-aside a.text-neutral-400 {
+.shell-sidebar a.text-neutral-400 {
   color: var(--aeon-text-dim) !important;
 }
 
 /* Nav item — inactive hover */
-aside a.hover\:bg-neutral-800:hover {
+.shell-sidebar a.hover\:bg-neutral-800:hover {
   background-color: rgba(0, 229, 255, 0.04) !important;
 }
-aside a.hover\:text-white:hover {
+.shell-sidebar a.hover\:text-white:hover {
   color: var(--aeon-text) !important;
 }
 
-/* Nav item — active state (bg-orange-500/20 text-orange-500) */
-aside a.bg-orange-500\/20 {
+/* Nav item — active state */
+.shell-sidebar a.bg-orange-500\/20 {
   background-color: rgba(0, 229, 255, 0.06) !important;
   color: var(--aeon-accent) !important;
   box-shadow: 0 0 16px rgba(0, 229, 255, 0.12) !important;
   border-left: 2px solid var(--aeon-accent) !important;
 }
 
-/* Active nav glow overlay (motion layoutId div inside active link) */
-aside a.bg-orange-500\/20 .absolute {
+/* Active nav glow overlay */
+.shell-sidebar a.bg-orange-500\/20 .absolute {
   background: linear-gradient(90deg, rgba(0, 229, 255, 0.08), rgba(0, 229, 255, 0.03)) !important;
 }
 
 /* Submenu active item */
-aside .text-orange-500.bg-neutral-800 {
+.shell-sidebar .text-orange-500.bg-neutral-800 {
   background-color: rgba(0, 229, 255, 0.06) !important;
   color: var(--aeon-accent) !important;
 }
 
 /* Submenu inactive item */
-aside a.text-neutral-500 {
+.shell-sidebar a.text-neutral-500 {
   color: var(--aeon-text-dim) !important;
 }
 
-/* Sidebar toggle / icon buttons */
-aside button.text-neutral-400 {
+/* Sidebar icon buttons */
+.shell-sidebar button.text-neutral-400 {
   color: var(--aeon-text-dim) !important;
 }
-aside button.hover\:text-orange-500:hover {
+.shell-sidebar button.hover\:text-orange-500:hover {
   color: var(--aeon-accent) !important;
 }
-aside button.hover\:bg-neutral-800:hover {
+.shell-sidebar button.hover\:bg-neutral-800:hover {
   background-color: rgba(0, 229, 255, 0.04) !important;
 }
 
-/* ── Main layout wrapper — strip Tailwind bg from flex container ── */
-.flex.h-screen > .flex-1 {
+/* ── Body content area background ── */
+.shell-body {
   background-color: var(--aeon-bg) !important;
 }
 
-/* ── Topbar header ── */
-header.h-16 {
+/* ── Topbar ── */
+.shell-topbar {
   background-color: var(--aeon-bg2) !important;
   border-color: var(--aeon-border) !important;
 }
 
-header.h-16 .text-neutral-400,
-header.h-16 .text-neutral-500 {
+.shell-topbar .text-neutral-400,
+.shell-topbar .text-neutral-500 {
   color: var(--aeon-text-dim) !important;
 }
 
 /* Status dot: green → AEON accent */
-header.h-16 .bg-green-500 {
+.shell-topbar .bg-green-500 {
   background-color: var(--aeon-accent) !important;
   box-shadow: 0 0 6px var(--aeon-accent) !important;
 }
 
 /* ── Main content area ── */
-main.bg-neutral-950 {
-  background-color: var(--aeon-bg) !important;
-}
-
-/* ── Mobile shell header ── */
-header.bg-neutral-900 {
-  background-color: var(--aeon-bg2) !important;
-  border-color: var(--aeon-border) !important;
-}
-
-/* Mobile logo text */
-header.bg-neutral-900 .text-orange-500 {
-  color: var(--aeon-accent) !important;
-  text-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
-}
-
-/* Mobile main */
-main.bg-neutral-950.pb-24 {
+.shell-main {
   background-color: var(--aeon-bg) !important;
 }

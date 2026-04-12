@@ -1,0 +1,554 @@
+:root {
+  --cyber-cyan: #00f0ff;
+  --cyber-cyan-dim: #00a8b3;
+  --cyber-cyan-glow: rgba(0, 240, 255, 0.5);
+  --cyber-magenta: #ff00ff;
+  --cyber-magenta-dim: #b300b3;
+  --cyber-magenta-glow: rgba(255, 0, 255, 0.5);
+  --cyber-yellow: #ffe600;
+  --cyber-yellow-dim: #b3a200;
+  --cyber-yellow-glow: rgba(255, 230, 0, 0.5);
+  --cyber-red: #ff0044;
+  --cyber-red-glow: rgba(255, 0, 68, 0.5);
+  --cyber-green: #00ff66;
+  --cyber-green-glow: rgba(0, 255, 102, 0.5);
+  --cyber-bg-darkest: #0a0a0f;
+  --cyber-bg-dark: #0d0d14;
+  --cyber-bg-medium: #12121a;
+  --cyber-bg-light: #1a1a25;
+  --cyber-bg-lighter: #252535;
+  --cyber-surface: rgba(20, 20, 35, 0.8);
+  --cyber-surface-hover: rgba(30, 30, 50, 0.9);
+  --cyber-surface-active: rgba(40, 40, 60, 0.95);
+  --cyber-border: rgba(0, 240, 255, 0.2);
+  --cyber-border-hover: rgba(0, 240, 255, 0.4);
+  --cyber-border-focus: rgba(0, 240, 255, 0.8);
+  --cyber-text-primary: #e0e0e0;
+  --cyber-text-secondary: #a0a0a0;
+  --cyber-text-muted: #606070;
+  --cyber-glow-sm: 0 0 5px rgba(0, 240, 255, 0.5);
+  --cyber-glow-md: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.5);
+  --cyber-glow-lg: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 30px rgba(0, 240, 255, 0.5), 0 0 50px rgba(0, 240, 255, 0.5);
+  --cyber-glow-magenta: 0 0 10px rgba(255, 0, 255, 0.5), 0 0 20px rgba(255, 0, 255, 0.5);
+  --cyber-glow-yellow: 0 0 10px rgba(255, 230, 0, 0.5), 0 0 20px rgba(255, 230, 0, 0.5);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--cyber-bg-darkest);
+  color: var(--cyber-text-primary);
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  min-height: 100vh;
+  background-image:
+    linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.1) 0px,
+    rgba(0,0,0,0.1) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  opacity: 0.15;
+}
+
+h1, h2, h3, h4, h5, h6,
+.font-display, .nav-label, .btn, button, .badge {
+  font-family: "Orbitron", "Rajdhani", sans-serif;
+}
+
+.cyber-card {
+  position: relative;
+  background: var(--cyber-surface);
+  border: 1px solid var(--cyber-border);
+  padding: 1.5rem;
+  clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px));
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.cyber-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyber-cyan), transparent);
+  opacity: 0.8;
+}
+.cyber-card:hover {
+  border-color: var(--cyber-border-hover);
+  box-shadow: var(--cyber-glow-sm);
+}
+
+.cyber-btn {
+  position: relative;
+  padding: 0.75rem 1.5rem;
+  font-family: "Orbitron", monospace;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--cyber-cyan);
+  background: var(--cyber-surface);
+  color: var(--cyber-cyan);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  min-height: 44px;
+}
+.cyber-btn:hover {
+  background: var(--cyber-cyan);
+  color: var(--cyber-bg-darkest);
+  box-shadow: var(--cyber-glow-md);
+}
+.cyber-btn-magenta {
+  border-color: var(--cyber-magenta);
+  color: var(--cyber-magenta);
+}
+.cyber-btn-magenta:hover {
+  background: var(--cyber-magenta);
+  color: var(--cyber-bg-darkest);
+  box-shadow: var(--cyber-glow-magenta);
+}
+
+.cyber-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid var(--cyber-cyan);
+  color: var(--cyber-cyan);
+}
+.cyber-badge::before {
+  content: "";
+  width: 6px; height: 6px;
+  margin-right: 0.5rem;
+  background: currentColor;
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+  animation: pulse 2s infinite;
+}
+.cyber-badge-green { border-color: var(--cyber-green); color: var(--cyber-green); background: rgba(0,255,102,0.1); }
+.cyber-badge-red { border-color: var(--cyber-red); color: var(--cyber-red); background: rgba(255,0,68,0.1); }
+.cyber-badge-yellow { border-color: var(--cyber-yellow); color: var(--cyber-yellow); background: rgba(255,230,0,0.1); }
+.cyber-badge-magenta { border-color: var(--cyber-magenta); color: var(--cyber-magenta); background: rgba(255,0,255,0.1); }
+
+.cyber-input {
+  width: 100%;
+  background: var(--cyber-bg-medium);
+  border: 1px solid var(--cyber-border);
+  color: var(--cyber-text-primary);
+  font-family: "JetBrains Mono", monospace;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-height: 44px;
+}
+.cyber-input:focus {
+  border-color: var(--cyber-border-focus);
+  box-shadow: var(--cyber-glow-sm);
+}
+
+.cyber-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cyber-text-secondary);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  transition: all 0.2s ease;
+  min-height: 44px;
+}
+.cyber-sidebar-item:hover,
+.cyber-sidebar-item.active {
+  color: var(--cyber-cyan);
+  background: var(--cyber-surface);
+  border-left-color: var(--cyber-cyan);
+  box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.03);
+}
+
+.cyber-section-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--cyber-text-muted);
+  padding: 1rem 1.25rem 0.25rem;
+}
+.cyber-section-label::before {
+  content: "// ";
+  color: var(--cyber-cyan);
+  opacity: 0.5;
+}
+
+table.cyber-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+}
+table.cyber-table th {
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cyber-cyan);
+  border-bottom: 1px solid var(--cyber-border);
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+table.cyber-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.05);
+  color: var(--cyber-text-primary);
+}
+table.cyber-table tr:hover td {
+  background: var(--cyber-surface);
+}
+
+@keyframes neonFlicker {
+  0%,19%,21%,23%,25%,54%,56%,100% { opacity: 1; }
+  20%,24%,55% { opacity: 0.8; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes glitch {
+  0%,100% { text-shadow: 2px 0 var(--cyber-magenta), -2px 0 var(--cyber-cyan); }
+  25% { text-shadow: -2px 0 var(--cyber-magenta), 2px 0 var(--cyber-cyan); }
+  50% { text-shadow: 2px 2px var(--cyber-magenta), -2px -2px var(--cyber-cyan); }
+  75% { text-shadow: -2px 2px var(--cyber-magenta), 2px -2px var(--cyber-cyan); }
+}
+@keyframes dataLoad {
+  0%,100% { height: 8px; }
+  50% { height: 24px; }
+}
+
+@media (max-width: 767px) {
+  .cyber-card { padding: 1rem; }
+  .cyber-btn { width: 100%; justify-content: center; }
+  table.cyber-table { display: block; overflow-x: auto; white-space: nowrap; }
+}
+
+/* ============================================================
+   GLOBAL CYBERPUNK OVERRIDES
+   Restyle all existing Shadcn/Tailwind components globally
+   without touching individual page files.
+   ============================================================ */
+
+/* ── STEP 7: ALL CARDS / PANELS ── */
+[class*="rounded-lg"][class*="border"][class*="bg-"],
+[class*="rounded-xl"][class*="border"][class*="bg-"],
+.card, [data-slot="card"],
+div[class*="bg-card"],
+div[class*="bg-neutral-900"],
+div[class*="bg-neutral-800"],
+div[class*="bg-zinc-900"],
+div[class*="bg-zinc-800"] {
+  background: var(--cyber-surface) !important;
+  border-color: var(--cyber-border) !important;
+  color: var(--cyber-text-primary) !important;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  position: relative;
+}
+
+/* Cyan top-line for cards (applied via box-shadow since ::before can't target all) */
+[class*="rounded-lg"][class*="border"][class*="bg-"]:hover,
+[class*="rounded-xl"][class*="border"][class*="bg-"]:hover,
+.card:hover, [data-slot="card"]:hover {
+  border-color: var(--cyber-border-hover) !important;
+  box-shadow: var(--cyber-glow-sm) !important;
+}
+
+/* Override existing aeon-card */
+.aeon-card {
+  background: var(--cyber-surface) !important;
+  border-color: var(--cyber-border) !important;
+  clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px));
+}
+.aeon-card::before {
+  background: linear-gradient(90deg, transparent, var(--cyber-cyan), transparent) !important;
+}
+.aeon-card:hover {
+  border-color: var(--cyber-border-hover) !important;
+  box-shadow: var(--cyber-glow-sm) !important;
+}
+
+/* ── STEP 8: ALL BUTTONS ── */
+button:not(.shell-menu-btn):not(.shell-sidebar-close):not([class*="clerk"]):not([data-clerk]):not([class*="cl-"]),
+[role="button"],
+a[class*="btn"],
+.aeon-btn {
+  font-family: "Orbitron", monospace !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-height: 44px;
+  transition: all 0.3s ease;
+}
+
+/* Primary action buttons */
+button[class*="bg-primary"],
+button[class*="bg-orange"],
+button[class*="bg-blue"],
+button[class*="bg-indigo"],
+.aeon-btn:not(.ghost) {
+  background: var(--cyber-surface) !important;
+  border: 1px solid var(--cyber-cyan) !important;
+  color: var(--cyber-cyan) !important;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+button[class*="bg-primary"]:hover,
+button[class*="bg-orange"]:hover,
+button[class*="bg-blue"]:hover,
+button[class*="bg-indigo"]:hover,
+.aeon-btn:not(.ghost):hover {
+  background: var(--cyber-cyan) !important;
+  color: var(--cyber-bg-darkest) !important;
+  box-shadow: var(--cyber-glow-md) !important;
+}
+
+/* Destructive buttons */
+button[class*="bg-red"],
+button[class*="bg-destructive"],
+button[class*="text-red"] {
+  background: var(--cyber-surface) !important;
+  border: 1px solid var(--cyber-magenta) !important;
+  color: var(--cyber-magenta) !important;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+button[class*="bg-red"]:hover,
+button[class*="bg-destructive"]:hover {
+  background: var(--cyber-magenta) !important;
+  color: var(--cyber-bg-darkest) !important;
+  box-shadow: var(--cyber-glow-magenta) !important;
+}
+
+/* Ghost/outline buttons */
+button[class*="variant-outline"],
+button[class*="variant-ghost"],
+button[class*="bg-transparent"],
+.aeon-btn.ghost {
+  background: transparent !important;
+  border: 1px solid var(--cyber-border) !important;
+  color: var(--cyber-text-secondary) !important;
+}
+button[class*="variant-outline"]:hover,
+button[class*="variant-ghost"]:hover,
+.aeon-btn.ghost:hover {
+  background: var(--cyber-surface) !important;
+  border-color: var(--cyber-cyan) !important;
+  color: var(--cyber-cyan) !important;
+}
+
+/* ── STEP 9: ALL INPUTS & FORMS ── */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input:not([type]),
+textarea,
+select,
+[data-slot="input"],
+[class*="bg-neutral"][class*="border"][class*="rounded"] input {
+  width: 100%;
+  background: var(--cyber-bg-medium) !important;
+  border: 1px solid var(--cyber-border) !important;
+  color: var(--cyber-text-primary) !important;
+  font-family: "JetBrains Mono", monospace !important;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-height: 44px;
+}
+input:focus,
+textarea:focus,
+select:focus,
+[data-slot="input"]:focus {
+  border-color: var(--cyber-border-focus) !important;
+  box-shadow: var(--cyber-glow-sm) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--cyber-text-muted) !important;
+}
+
+/* Labels */
+label,
+[class*="text-sm"][class*="font-medium"] {
+  font-family: "Orbitron", sans-serif !important;
+  font-size: 0.75rem !important;
+  text-transform: uppercase;
+  color: var(--cyber-cyan) !important;
+  letter-spacing: 0.1em;
+}
+
+/* ── STEP 10: ALL TABLES ── */
+table,
+.aeon-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+}
+table th,
+.aeon-table th {
+  font-family: "Orbitron", sans-serif !important;
+  font-size: 0.7rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cyber-cyan) !important;
+  border-bottom: 1px solid var(--cyber-border) !important;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  background: transparent !important;
+}
+table td,
+.aeon-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.05) !important;
+  color: var(--cyber-text-primary) !important;
+}
+table tr:hover td,
+.aeon-table tr:hover td {
+  background: var(--cyber-surface) !important;
+}
+
+/* Status badge overrides */
+[class*="badge"],
+.aeon-badge,
+span[class*="rounded-full"][class*="px-"] {
+  font-family: "JetBrains Mono", monospace !important;
+  font-size: 0.7rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Green/success badges */
+[class*="bg-green"],
+[class*="text-green"],
+.aeon-badge.won {
+  background: rgba(0, 255, 102, 0.1) !important;
+  color: var(--cyber-green) !important;
+  border: 1px solid var(--cyber-green) !important;
+}
+
+/* Red/error badges */
+[class*="bg-red"][class*="rounded"],
+.aeon-badge.hot {
+  background: rgba(255, 0, 68, 0.1) !important;
+  color: var(--cyber-red) !important;
+  border: 1px solid var(--cyber-red) !important;
+}
+
+/* Yellow/warning badges */
+[class*="bg-yellow"],
+[class*="bg-amber"],
+.aeon-badge.warm {
+  background: rgba(255, 230, 0, 0.1) !important;
+  color: var(--cyber-yellow) !important;
+  border: 1px solid var(--cyber-yellow) !important;
+}
+
+/* Mobile table scroll */
+@media (max-width: 767px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* ── GLOBAL TYPOGRAPHY OVERRIDES ── */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--cyber-text-primary) !important;
+}
+
+p, span, div {
+  color: inherit;
+}
+
+/* Muted text overrides */
+[class*="text-neutral-400"],
+[class*="text-neutral-500"],
+[class*="text-gray-400"],
+[class*="text-gray-500"],
+[class*="text-zinc-400"],
+[class*="text-zinc-500"],
+[class*="text-muted"] {
+  color: var(--cyber-text-secondary) !important;
+}
+
+/* Link color overrides */
+a:not(.cyber-sidebar-item):not([class*="clerk"]):not([class*="cl-"]) {
+  color: var(--cyber-cyan);
+  transition: color 0.2s;
+}
+a:not(.cyber-sidebar-item):not([class*="clerk"]):not([class*="cl-"]):hover {
+  color: var(--cyber-magenta);
+}
+
+/* Background overrides for page containers */
+[class*="bg-neutral-950"],
+[class*="bg-neutral-900"],
+[class*="bg-zinc-950"],
+[class*="bg-zinc-900"],
+[class*="bg-black"] {
+  background: var(--cyber-bg-darkest) !important;
+}
+
+/* Border overrides */
+[class*="border-neutral"],
+[class*="border-zinc"],
+[class*="border-gray"] {
+  border-color: var(--cyber-border) !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--cyber-bg-darkest);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--cyber-border);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cyber-border-hover);
+}
+
+/* ── Selection color ── */
+::selection {
+  background: rgba(0, 240, 255, 0.3);
+  color: var(--cyber-text-primary);
+}

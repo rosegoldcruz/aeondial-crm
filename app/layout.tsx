@@ -50,9 +50,10 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/favicon.svg" />
         <link rel="mask-icon" href="/favicon.svg" color="#FF4500" />
         <meta name="msapplication-TileImage" content="/favicon.svg" />
-        <meta name="theme-color" content="#18181B" />
+        <meta name="theme-color" content="#0a0a0f" />
+        <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet" />
       </head>
-      <body className={`${inter.className} bg-neutral-950 text-white antialiased`}>
+      <body className={`${inter.className} antialiased`} style={{ background: 'var(--cyber-bg-darkest)', color: 'var(--cyber-text-primary)' }}>
         <ClerkProvider
           signInFallbackRedirectUrl="/dialer"
           signUpFallbackRedirectUrl="/dialer"
@@ -61,12 +62,12 @@ export default function RootLayout({
             <SignedOut>
               <div className="flex items-center gap-2">
                 <SignInButton>
-                  <button className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm text-white">
+                  <button className="cyber-btn" style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}>
                     Sign in
                   </button>
                 </SignInButton>
                 <SignUpButton>
-                  <button className="rounded-md bg-orange-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-600">
+                  <button className="cyber-btn cyber-btn-magenta" style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}>
                     Sign up
                   </button>
                 </SignUpButton>

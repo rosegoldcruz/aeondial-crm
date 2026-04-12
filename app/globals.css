@@ -116,6 +116,39 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Cyberpunk design system tokens */
+  --color-background: #0a0a0f;
+  --color-surface: rgba(20, 20, 35, 0.8);
+  --color-surfaceSoft: #12121a;
+  --color-surfaceHover: rgba(30, 30, 50, 0.9);
+  --color-cyber-cyan: #00f0ff;
+  --color-cyber-cyanDim: #00a8b3;
+  --color-cyber-magenta: #ff00ff;
+  --color-cyber-magentaDim: #b300b3;
+  --color-cyber-yellow: #ffe600;
+  --color-cyber-yellowDim: #b3a200;
+  --color-cyber-red: #ff0044;
+  --color-cyber-green: #00ff66;
+  --color-bgDarkest: #0a0a0f;
+  --color-bgDark: #0d0d14;
+  --color-bgMedium: #12121a;
+  --color-bgLight: #1a1a25;
+  --color-bgLighter: #252535;
+  --color-borderSubtle: rgba(0,240,255,0.2);
+  --color-borderHover: rgba(0,240,255,0.4);
+  --color-borderFocus: rgba(0,240,255,0.8);
+  --color-textPrimary: #e0e0e0;
+  --color-textSecondary: #a0a0a0;
+  --color-textMuted: #606070;
+  --shadow-cyberSm: 0 0 5px rgba(0,240,255,0.5);
+  --shadow-cyberMd: 0 0 10px rgba(0,240,255,0.5), 0 0 20px rgba(0,240,255,0.5);
+  --shadow-cyberLg: 0 0 10px rgba(0,240,255,0.5), 0 0 30px rgba(0,240,255,0.5), 0 0 50px rgba(0,240,255,0.5);
+  --shadow-cyberMagenta: 0 0 10px rgba(255,0,255,0.5), 0 0 20px rgba(255,0,255,0.5);
+  --shadow-cyberYellow: 0 0 10px rgba(255,230,0,0.5), 0 0 20px rgba(255,230,0,0.5);
+  --shadow-cyberInset: inset 0 0 20px rgba(0,240,255,0.05);
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --font-display: "Orbitron", "Rajdhani", sans-serif;
 }
 
 @layer base {
