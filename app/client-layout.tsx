@@ -347,7 +347,7 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
             </div>
 
             {/* Nav — overscroll-contain keeps wheel events in the sidebar */}
-            <nav className="px-1 py-2 space-y-0.5 flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain', minHeight: 0 }}>
+            <nav className="px-1 py-2 space-y-0.5 flex-1 overflow-y-auto overscroll-contain" style={{ minHeight: 0 }}>
               {navigation.map((item) => (
                 <div
                   key={item.name}

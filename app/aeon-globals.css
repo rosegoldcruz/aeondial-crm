@@ -438,10 +438,7 @@
   border-right: 1px solid var(--aeon-border);
   display: flex;
   flex-direction: column;
-  /* overflow:clip clips visual overflow without creating a scroll container,
-     so wheel events still reach the scrollable <nav> inside */
-  overflow: clip;
-  overflow-clip-margin: 0px;
+  overflow: hidden;
 }
 
 /* Mobile: sidebar slides in when .is-open */
