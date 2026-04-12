@@ -17,10 +17,8 @@ export default function MobileBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#0a0a0a] border-t border-[#262626]"
       style={{
-        background: 'var(--cyber-bg-dark)',
-        borderTop: '1px solid var(--cyber-border)',
         paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
       }}
     >

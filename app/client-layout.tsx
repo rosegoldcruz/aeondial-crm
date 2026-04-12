@@ -203,11 +203,7 @@ function ClerkShellControls({ compact = false }: { compact?: boolean }) {
   )
 }
 
-export default function ClientLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function ClientLayout({ children: pageContent }: React.PropsWithChildren) {
   const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
   const [headerDate, setHeaderDate] = useState("")
@@ -302,54 +298,15 @@ export default function ClientLayout({
   }
 
   if (isAuthPage || isHomePage) {
-    return (
-      <ScrollProvider>
-        {children}
-      </ScrollProvider>
-    )
+    return <ScrollProvider>{pageContent}</ScrollProvider>
   }
 
   return (
     <ScrollProvider>
-      {/* Mobile shell — visible only below md */}
-      <div className="md:hidden flex min-h-screen flex-col" style={{ background: "var(--cyber-bg-darkest)" }}>
-        <header className="shell-topbar" style={{ background: "var(--cyber-bg-dark)", borderBottom: "1px solid var(--cyber-border)" }}>
-          <button
-            className="shell-menu-btn cyber-btn"
-            style={{ padding: "6px", minHeight: "auto", border: "1px solid var(--cyber-border)" }}
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
-
-          <span className="shell-brand" style={{ fontFamily: '"Orbitron", sans-serif', color: "var(--cyber-cyan)", textShadow: "0 0 12px rgba(0, 240, 255, 0.35)" }}>
-            AEON DIAL
-          </span>
-
-          <div className="ml-auto flex items-center gap-3">
-            <SignedIn>
-              <ClerkShellControls compact />
-            </SignedIn>
-            <div className="cyber-badge cyber-badge-green" style={{ fontSize: "0.6rem" }}>
-              <span>Online</span>
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 overflow-y-auto pb-24" style={{ background: "var(--cyber-bg-darkest)" }}>
-          {children}
-        </main>
-
-        <DrawerNav isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
-        <MobileBottomNav />
-        <FloatingDialer />
-      </div>
-
-      {/* Desktop shell — hidden on mobile, visible at md+ */}
-      <div className="shell-layout hidden md:block">
+      <div className="flex h-screen overflow-hidden bg-[#0a0a0a]">
         <aside className={[
           "shell-sidebar",
+          "hidden md:flex",
           sidebarHoverMode ? "hover-mode" : "",
           sidebarPinned ? "pinned" : "",
         ].filter(Boolean).join(" ")}>
@@ -503,8 +460,25 @@ export default function ClientLayout({
           </div>
         </aside>
 
-        <div className={`shell-body${sidebarHoverMode ? " sidebar-hover-mode" : ""}`}>
-          <header className="shell-topbar" style={{ background: 'var(--cyber-bg-dark)', borderBottom: '1px solid var(--cyber-border)' }}>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <header className="md:hidden sticky top-0 z-40 flex items-center justify-between h-14 px-4 border-b border-[#262626] bg-[#0a0a0a]/95 backdrop-blur-md flex-shrink-0">
+            <h1 className="text-lg font-bold text-[#FF6B35]">AEON DIAL</h1>
+
+            <div className="flex items-center gap-2">
+              <SignedIn>
+                <ClerkShellControls compact />
+              </SignedIn>
+              <button
+                onClick={() => setDrawerOpen(true)}
+                className="p-2 text-neutral-400 hover:text-white"
+                aria-label="Open menu"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            </div>
+          </header>
+
+          <header className="hidden md:flex h-16 bg-neutral-900 border-b border-neutral-800 items-center justify-between px-4 lg:px-6 flex-shrink-0">
             <button
               className="shell-menu-btn cyber-btn"
               style={{ padding: '6px', minHeight: 'auto', border: '1px solid var(--cyber-border)' }}
@@ -541,9 +515,16 @@ export default function ClientLayout({
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto shell-main" style={{ background: 'var(--cyber-bg-darkest)' }}>{children}</main>
+          <main className="flex-1 overflow-y-auto bg-neutral-950 pb-20 md:pb-0">
+            {pageContent}
+          </main>
+
+          <div className="md:hidden">
+            <MobileBottomNav />
+          </div>
         </div>
 
+        <DrawerNav isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
         <FloatingDialer />
       </div>
     </ScrollProvider>
