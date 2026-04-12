@@ -2,49 +2,52 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, UserCheck, Phone, PhoneCall, Bot } from "lucide-react"
+import { BarChart3, UserCheck, Phone, PhoneCall, LayoutGrid } from "lucide-react"
 
-const tabs = [
-  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
-  { name: "Leads", href: "/leads", icon: UserCheck },
-  { name: "Campaigns", href: "/campaigns", icon: Phone },
-  { name: "Outbound", href: "/outbound", icon: PhoneCall },
-  { name: "Fox Intel", href: "/fox", icon: Bot },
+const TABS = [
+  { label: "Dashboard", href: "/dashboard",  icon: BarChart3   },
+  { label: "Leads",     href: "/leads",       icon: UserCheck   },
+  { label: "Dialer",    href: "/dialer",      icon: PhoneCall   },
+  { label: "Campaigns", href: "/campaigns",   icon: Phone       },
+  { label: "Menu",      href: "/menu",        icon: LayoutGrid  },
 ]
 
-export default function MobileBottomNav() {
+export function MobileBottomNav() {
   const pathname = usePathname()
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#0a0a0a] border-t border-[#262626]"
-      style={{
-        paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
-      }}
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a] border-t border-[#262626]"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="flex items-center justify-around px-2 py-1.5">
-        {tabs.map((tab) => {
-          const isActive = pathname === tab.href || pathname?.startsWith(tab.href + "/")
+      <div className="flex items-stretch h-14">
+        {TABS.map((tab) => {
+          const active = pathname === tab.href
+            || (tab.href !== "/menu" && pathname?.startsWith(tab.href))
+          const isDialer = tab.href === "/dialer"
+
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className="flex flex-col items-center gap-0.5 px-2 py-1 min-w-[56px]"
-              style={{
-                color: isActive ? 'var(--cyber-cyan)' : 'var(--cyber-text-muted)',
-                textShadow: isActive ? '0 0 8px rgba(0, 240, 255, 0.5)' : 'none',
-              }}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors"
             >
-              <tab.icon className="w-5 h-5" />
+              <tab.icon
+                className={`w-5 h-5 ${
+                  active || isDialer
+                    ? "text-[#FF6B35]"
+                    : "text-[#525252]"
+                }`}
+                strokeWidth={active ? 2.5 : 1.5}
+              />
               <span
-                style={{
-                  fontFamily: '"Orbitron", sans-serif',
-                  fontSize: '0.6rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                }}
+                className={`text-[9px] font-medium tracking-wider uppercase ${
+                  active || isDialer
+                    ? "text-[#FF6B35]"
+                    : "text-[#525252]"
+                }`}
               >
-                {tab.name}
+                {tab.label}
               </span>
             </Link>
           )

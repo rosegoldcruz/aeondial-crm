@@ -19,9 +19,9 @@ import {
   Target,
   Calendar,
   Building2,
-  X,
   Pin,
   PinOff,
+  X,
 } from "lucide-react"
 import {
   OrganizationSwitcher,
@@ -40,8 +40,7 @@ import { useHapticFeedback } from "@/hooks/use-haptic-feedback"
 import { useDeviceCapabilities } from "@/hooks/use-device-capabilities"
 import { usePerformanceGovernor } from "@/hooks/use-performance-governor"
 import { getAnimationConfig } from "@/lib/animation-config"
-import MobileBottomNav from "@/components/MobileBottomNav"
-import DrawerNav from "@/components/DrawerNav"
+import { MobileBottomNav } from "@/components/MobileBottomNav"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -208,7 +207,6 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
   const [mounted, setMounted] = useState(false)
   const [headerDate, setHeaderDate] = useState("")
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
-  const [drawerOpen, setDrawerOpen] = useState(false)
   const [sidebarHoverMode, setSidebarHoverMode] = useState(false)
   const [sidebarPinned, setSidebarPinned] = useState(false)
   const auroraRef = useRef<HTMLDivElement>(null)
@@ -255,11 +253,6 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
   }, [animConfig.enableGlow, governor.animationScale])
 
   // Removed micro-jitter loop from nav items to keep shell motion stable.
-
-  // Close mobile sidebar on route change
-  useEffect(() => {
-    setDrawerOpen(false)
-  }, [pathname])
 
   const toggleSubmenu = (name: string) => {
     vibrate("light")
@@ -346,7 +339,6 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
                 <button
                   className="shell-sidebar-close cyber-btn h-8 w-8 items-center justify-center"
                   style={{ padding: '4px', minHeight: 'auto', border: '1px solid var(--cyber-border)' }}
-                  onClick={() => setDrawerOpen(false)}
                   aria-label="Close menu"
                 >
                   <X className="w-4 h-4" />
@@ -461,32 +453,34 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
         </aside>
 
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <header className="md:hidden sticky top-0 z-40 flex items-center justify-between h-14 px-4 border-b border-[#262626] bg-[#0a0a0a]/95 backdrop-blur-md flex-shrink-0">
-            <h1 className="text-lg font-bold text-[#FF6B35]">AEON DIAL</h1>
-
-            <div className="flex items-center gap-2">
+          <header className="md:hidden sticky top-0 z-40 h-12 flex items-center justify-between px-4 bg-[#0a0a0a] border-b border-[#262626] flex-shrink-0">
+            <span className="text-sm font-bold text-[#FF6B35] tracking-widest">AEON DIAL</span>
+            <div className="flex items-center gap-2 ml-auto">
               <SignedIn>
-                <ClerkShellControls compact />
+                <OrganizationSwitcher
+                  hidePersonal
+                  appearance={{
+                    elements: {
+                      rootBox: "h-7",
+                      organizationSwitcherTrigger:
+                        "h-7 text-xs text-white bg-[#1a1a1a] border border-[#262626] rounded-md px-2 py-1",
+                      organizationSwitcherTriggerIcon: "text-[#FF6B35]",
+                    },
+                  }}
+                />
+                <UserButton
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: {
+                      avatarBox: "h-7 w-7",
+                    },
+                  }}
+                />
               </SignedIn>
-              <button
-                onClick={() => setDrawerOpen(true)}
-                className="p-2 text-neutral-400 hover:text-white"
-                aria-label="Open menu"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
             </div>
           </header>
 
           <header className="hidden md:flex h-16 bg-neutral-900 border-b border-neutral-800 items-center justify-between px-4 lg:px-6 flex-shrink-0">
-            <button
-              className="shell-menu-btn cyber-btn"
-              style={{ padding: '6px', minHeight: 'auto', border: '1px solid var(--cyber-border)' }}
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Open menu"
-            >
-              <Menu className="w-4 h-4" />
-            </button>
 
             {/* Brand — CSS: visible on mobile, hidden on desktop */}
             <span className="shell-brand" style={{ fontFamily: '"Orbitron", sans-serif', color: 'var(--cyber-cyan)', textShadow: '0 0 12px rgba(0, 240, 255, 0.35)' }}>AEON DIAL</span>
@@ -524,7 +518,6 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
           </div>
         </div>
 
-        <DrawerNav isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
         <FloatingDialer />
       </div>
     </ScrollProvider>
