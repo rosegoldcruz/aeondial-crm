@@ -1,35 +1,13 @@
 "use client"
-
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import {
-  LogIn,
-  Phone,
-  PhoneCall,
-  Users,
-  BarChart3,
-  Settings,
-  Shield,
-  Zap,
-  Bot,
-  Menu,
-  ChevronDown,
-  UserCheck,
-  Target,
-  Calendar,
-  Building2,
-  Pin,
-  PinOff,
-  X,
+  LogIn, Phone, PhoneCall, Users, BarChart3, Settings, Shield, Zap, Bot,
+  ChevronDown, UserCheck, Target, Calendar, Building2, ChevronRight,
+  LayoutDashboard, List, Megaphone, Headphones, Plug, SlidersHorizontal,
 } from "lucide-react"
 import {
-  OrganizationSwitcher,
-  SignInButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-  useAuth,
+  OrganizationSwitcher, SignInButton, SignedIn, SignedOut, UserButton, useAuth,
 } from "@clerk/nextjs"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -42,480 +20,381 @@ import { usePerformanceGovernor } from "@/hooks/use-performance-governor"
 import { getAnimationConfig } from "@/lib/animation-config"
 import { MobileBottomNav } from "@/components/MobileBottomNav"
 
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
+// ─────────────────────────────────────────────────────────────
+// NAV — grouped sections (ChatGPT / Claude / Manus style)
+// ─────────────────────────────────────────────────────────────
+const navGroups = [
   {
-    name: "Users",
-    href: "/users",
-    icon: Users,
-    submenu: [
-      { name: "All Users", href: "/users" },
-      { name: "User Stats", href: "/users/statistics" },
-      { name: "Timesheets", href: "/users/timesheets" },
+    label: null,
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     ],
   },
   {
-    name: "Agents",
-    href: "/agents",
-    icon: Users,
-    submenu: [
-      { name: "All Agents", href: "/agents" },
-      { name: "Live Dialer", href: "/dialer" },
-      { name: "Agent Workspace", href: "/agents/workspace" },
-      { name: "Agent Status", href: "/agents/status" },
-      { name: "Performance", href: "/agents/performance" },
-      { name: "Timeclock", href: "/agents/timeclock" },
+    label: "People",
+    items: [
+      { name: "Users", href: "/users", icon: Users, submenu: [
+        { name: "All Users", href: "/users" },
+        { name: "User Stats", href: "/users/statistics" },
+        { name: "Timesheets", href: "/users/timesheets" },
+      ]},
+      { name: "Agents", href: "/agents", icon: Headphones, submenu: [
+        { name: "All Agents", href: "/agents" },
+        { name: "Agent Status", href: "/agents/status" },
+        { name: "Agent Workspace", href: "/agents/workspace" },
+        { name: "Performance", href: "/agents/performance" },
+        { name: "Timeclock", href: "/agents/timeclock" },
+      ]},
+      { name: "Leads", href: "/leads", icon: UserCheck, submenu: [
+        { name: "All Leads", href: "/leads" },
+        { name: "Search Leads", href: "/leads/search" },
+      ]},
+      { name: "Opportunities", href: "/opportunities", icon: Target, submenu: [
+        { name: "Pipeline Board", href: "/opportunities" },
+      ]},
     ],
   },
   {
-    name: "Campaigns",
-    href: "/campaigns",
-    icon: Phone,
-    submenu: [
-      { name: "All Campaigns", href: "/campaigns" },
-      { name: "Create Campaign", href: "/campaigns/create" },
-      { name: "Statistics", href: "/campaigns/stats" },
+    label: "Outreach",
+    items: [
+      { name: "Campaigns", href: "/campaigns", icon: Megaphone, submenu: [
+        { name: "All Campaigns", href: "/campaigns" },
+        { name: "Create Campaign", href: "/campaigns/create" },
+        { name: "Statistics", href: "/campaigns/stats" },
+      ]},
+      { name: "Dialer", href: "/dialer", icon: PhoneCall },
+      { name: "Outbound", href: "/outbound", icon: Phone },
+      { name: "Lists", href: "/lists", icon: List, submenu: [
+        { name: "Lead Lists", href: "/lists" },
+      ]},
     ],
   },
   {
-    name: "Leads",
-    href: "/leads",
-    icon: UserCheck,
-    submenu: [
-      { name: "All Leads", href: "/leads" },
-      { name: "Search Leads", href: "/leads/search" },
+    label: "Schedule",
+    items: [
+      { name: "Calendars", href: "/calendars", icon: Calendar, submenu: [
+        { name: "Calendar View", href: "/calendars" },
+        { name: "Appointments", href: "/calendars/appointments" },
+        { name: "Settings", href: "/calendars/settings" },
+      ]},
     ],
   },
   {
-    name: "Opportunities",
-    href: "/opportunities",
-    icon: Target,
-    submenu: [{ name: "Pipeline Board", href: "/opportunities" }],
-  },
-  {
-    name: "Calendars",
-    href: "/calendars",
-    icon: Calendar,
-    submenu: [
-      { name: "Calendar View", href: "/calendars" },
-      { name: "Appointment List", href: "/calendars/appointments" },
-      { name: "Calendar Settings", href: "/calendars/settings" },
+    label: "Analytics",
+    items: [
+      { name: "Reports", href: "/reports", icon: BarChart3, submenu: [
+        { name: "Real-Time", href: "/reports/realtime" },
+        { name: "Agents", href: "/reports/agents" },
+        { name: "Campaigns", href: "/reports/campaigns" },
+        { name: "Calls", href: "/reports/calls" },
+      ]},
     ],
   },
   {
-    name: "Reports",
-    href: "/reports",
-    icon: BarChart3,
-    submenu: [
-      { name: "Real-Time", href: "/reports/realtime" },
-      { name: "Agents", href: "/reports/agents" },
-      { name: "Campaigns", href: "/reports/campaigns" },
-      { name: "Calls", href: "/reports/calls" },
+    label: "Automation",
+    items: [
+      { name: "Automation", href: "/automation", icon: Zap, submenu: [
+        { name: "Workflows", href: "/automation" },
+        { name: "Triggers", href: "/automation/triggers" },
+      ]},
+      { name: "Fox Intelligence", href: "/fox", icon: Bot },
     ],
   },
-  { name: "Outbound", href: "/outbound", icon: Phone },
-  { name: "Dialer", href: "/dialer", icon: PhoneCall },
-  { name: "Compliance", href: "/compliance", icon: Shield },
   {
-    name: "Automation",
-    href: "/automation",
-    icon: Zap,
-    submenu: [
-      { name: "Workflows", href: "/automation" },
-      { name: "Triggers", href: "/automation/triggers" },
+    label: "Compliance",
+    items: [
+      { name: "Compliance", href: "/compliance", icon: Shield, submenu: [
+        { name: "DNC Numbers", href: "/compliance/dnc" },
+      ]},
     ],
   },
-  { name: "Admin", href: "/admin", icon: Settings },
-  { name: "Integrations", href: "/integrations", icon: Zap },
-  { name: "Fox Intelligence", href: "/fox", icon: Bot },
   {
-    name: "Settings",
-    href: "/settings",
-    icon: Settings,
-    submenu: [
-      { name: "Business Profile", href: "/settings/business" },
-      { name: "Team Management", href: "/settings/team" },
-      { name: "Telephony", href: "/settings/telephony" },
-      { name: "API & Integrations", href: "/settings/integrations" },
-      { name: "Notifications", href: "/settings/notifications" },
-      { name: "Billing", href: "/settings/billing" },
-      { name: "Account", href: "/settings/account" },
-      { name: "Security", href: "/settings/security" },
+    label: "System",
+    items: [
+      { name: "Admin", href: "/admin", icon: SlidersHorizontal },
+      { name: "Integrations", href: "/integrations", icon: Plug },
+      { name: "Settings", href: "/settings", icon: Settings, submenu: [
+        { name: "Business Profile", href: "/settings/business" },
+        { name: "Team Management", href: "/settings/team" },
+        { name: "Telephony", href: "/settings/telephony" },
+        { name: "API & Integrations", href: "/settings/integrations" },
+        { name: "Notifications", href: "/settings/notifications" },
+        { name: "Billing", href: "/settings/billing" },
+        { name: "Account", href: "/settings/account" },
+        { name: "Security", href: "/settings/security" },
+      ]},
     ],
   },
 ]
 
-function ClerkShellControls({ compact = false }: { compact?: boolean }) {
+function ClerkShellControls() {
   const pathname = usePathname()
   const router = useRouter()
   const { orgId } = useAuth()
   const previousOrgId = useRef<string | null | undefined>(orgId)
   const returnPath = pathname && pathname.startsWith("/") ? pathname : "/dialer"
   const syncUrl = `/org-sync?redirect_url=${encodeURIComponent(returnPath)}`
-
   useEffect(() => {
-    if (previousOrgId.current === orgId) {
-      return
-    }
-
+    if (previousOrgId.current === orgId) return
     previousOrgId.current = orgId
-
-    if (pathname?.startsWith("/dialer")) {
-      router.replace("/dialer")
-      router.refresh()
-    }
+    if (pathname?.startsWith("/dialer")) { router.replace("/dialer"); router.refresh() }
   }, [orgId, pathname, router])
-
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
-      {!orgId ? (
-        <div
-          className={
-            compact
-              ? "flex items-center gap-2 px-2 py-1 text-[11px]"
-              : "hidden xl:flex items-center gap-2 px-3 py-2 text-xs"
-          }
-          style={{
-            border: '1px solid rgba(255, 184, 0, 0.25)',
-            background: 'rgba(255, 184, 0, 0.08)',
-            color: '#ffb800',
-          }}
-        >
-          <Building2 className="h-3.5 w-3.5" style={{ color: '#ffb800' }} />
+      {!orgId && (
+        <div className="hidden xl:flex items-center gap-2 px-3 py-2 text-xs"
+          style={{ border: "1px solid rgba(255,184,0,0.25)", background: "rgba(255,184,0,0.08)", color: "#ffb800" }}>
+          <Building2 className="h-3.5 w-3.5" style={{ color: "#ffb800" }} />
           <span>No active organization selected</span>
         </div>
-      ) : null}
-
-      <div style={{ border: '1px solid var(--aeon-border)', background: 'var(--aeon-bg2)', borderRadius: '4px' }} className="px-1.5 py-1 backdrop-blur">
-        <OrganizationSwitcher
-          afterSelectOrganizationUrl={syncUrl}
-          afterCreateOrganizationUrl={syncUrl}
-          afterLeaveOrganizationUrl="/org-sync?redirect_url=%2Fdialer"
-          hidePersonal
-        />
+      )}
+      <div style={{ border: "1px solid var(--aeon-border)", background: "var(--aeon-bg2)", borderRadius: "4px" }} className="px-1.5 py-1 backdrop-blur">
+        <OrganizationSwitcher afterSelectOrganizationUrl={syncUrl} afterCreateOrganizationUrl={syncUrl} afterLeaveOrganizationUrl="/org-sync?redirect_url=%2Fdialer" hidePersonal />
       </div>
-
-      <div style={{ border: '1px solid var(--aeon-border)', background: 'var(--aeon-bg2)', borderRadius: '50%' }} className="p-1 backdrop-blur">
+      <div style={{ border: "1px solid var(--aeon-border)", background: "var(--aeon-bg2)", borderRadius: "50%" }} className="p-1 backdrop-blur">
         <UserButton afterSignOutUrl="/" />
       </div>
     </div>
   )
 }
 
+const COLLAPSED_W = 56
+const EXPANDED_W  = 220
+
 export default function ClientLayout({ children: pageContent }: React.PropsWithChildren) {
   const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
   const [headerDate, setHeaderDate] = useState("")
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
-  const [sidebarHoverMode, setSidebarHoverMode] = useState(false)
-  const [sidebarPinned, setSidebarPinned] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const auroraRef = useRef<HTMLDivElement>(null)
-  const navItemsRef = useRef<{ [key: string]: HTMLDivElement | null }>({})
-
   const capabilities = useDeviceCapabilities()
   const [governor] = usePerformanceGovernor(capabilities)
   const animConfig = getAnimationConfig(governor)
   const { vibrate } = useHapticFeedback()
-
   const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register")
   const isHomePage = pathname === "/"
 
   useEffect(() => {
     setMounted(true)
-    setHeaderDate(
-      new Intl.DateTimeFormat("en-US", {
-        weekday: "short",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }).format(new Date()),
-    )
+    setHeaderDate(new Intl.DateTimeFormat("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" }).format(new Date()))
   }, [])
 
-  // Load sidebar preferences from localStorage
   useEffect(() => {
     try {
-      setSidebarHoverMode(localStorage.getItem("sidebar_hover_mode") === "true")
-      setSidebarPinned(localStorage.getItem("sidebar_pinned") === "true")
+      const saved = localStorage.getItem("sidebar_expanded")
+      if (saved !== null) setExpanded(saved === "true")
     } catch {}
   }, [])
 
   useEffect(() => {
     if (auroraRef.current && animConfig.enableGlow) {
-      const duration = 2 / governor.animationScale
-      gsap.to(auroraRef.current, {
-        duration,
-        filter: "hue-rotate(360deg)",
-        repeat: -1,
-        ease: "none",
-      })
+      gsap.to(auroraRef.current, { duration: 2 / governor.animationScale, filter: "hue-rotate(360deg)", repeat: -1, ease: "none" })
     }
   }, [animConfig.enableGlow, governor.animationScale])
 
-  // Removed micro-jitter loop from nav items to keep shell motion stable.
+  const toggleExpanded = () => {
+    const next = !expanded
+    setExpanded(next)
+    try { localStorage.setItem("sidebar_expanded", String(next)) } catch {}
+  }
 
   const toggleSubmenu = (name: string) => {
     vibrate("light")
-    setExpandedMenus((prev) =>
-      prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name],
-    )
+    setExpandedMenus((prev) => prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name])
   }
 
-  const handleNavClick = (itemName: string) => {
-    vibrate("light")
-    if (auroraRef.current && animConfig.enableGlow) {
-      gsap.fromTo(
-        auroraRef.current,
-        { opacity: 0, scale: 0.8 },
-        {
-          opacity: 1,
-          scale: 1.2,
-          duration: 0.6 * governor.animationScale,
-          ease: "power2.out",
-          onComplete: () => {
-            gsap.to(auroraRef.current, {
-              opacity: 0.3,
-              scale: 1,
-              duration: 0.4 * governor.animationScale,
-            })
-          },
-        },
-      )
-    }
-  }
+  if (isAuthPage || isHomePage) return <ScrollProvider>{pageContent}</ScrollProvider>
 
-  const toggleSidebarPin = () => {
-    const next = !sidebarPinned
-    setSidebarPinned(next)
-    try { localStorage.setItem("sidebar_pinned", String(next)) } catch {}
-  }
+  const sidebarW = expanded ? EXPANDED_W : COLLAPSED_W
 
-  if (isAuthPage || isHomePage) {
-    return <ScrollProvider>{pageContent}</ScrollProvider>
-  }
+  const SidebarInner = () => (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{
+        display: "flex", alignItems: "center", height: 56, flexShrink: 0,
+        borderBottom: "1px solid var(--aeon-border)",
+        padding: expanded ? "0 10px 0 14px" : "0",
+        justifyContent: expanded ? "space-between" : "center",
+      }}>
+        {expanded && (
+          <span style={{ fontFamily: '"Orbitron", sans-serif', fontSize: "0.82rem", fontWeight: 700, letterSpacing: "0.12em", color: "var(--cyber-cyan)", textShadow: "0 0 12px rgba(0,240,255,0.35)", whiteSpace: "nowrap" }}>
+            AEON DIAL
+          </span>
+        )}
+        <button onClick={toggleExpanded} title={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--cyber-text-muted)", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 6, flexShrink: 0, transition: "color 0.15s" }}
+          onMouseEnter={e => (e.currentTarget.style.color = "var(--cyber-cyan)")}
+          onMouseLeave={e => (e.currentTarget.style.color = "var(--cyber-text-muted)")}>
+          <ChevronRight className="w-4 h-4" style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.22s cubic-bezier(0.16,1,0.3,1)" }} />
+        </button>
+      </div>
 
-  return (
-    <ScrollProvider>
-      <div className="flex h-screen overflow-hidden bg-[#0a0a0a]">
-        <aside className={[
-          "shell-sidebar",
-          "hidden md:flex",
-          sidebarHoverMode ? "hover-mode" : "",
-          sidebarPinned ? "pinned" : "",
-        ].filter(Boolean).join(" ")}>
-          {animConfig.enableGlow && (
-            <div
-              ref={auroraRef}
-              className="absolute inset-0 pointer-events-none opacity-30"
-              style={{
-                background:
-                  "radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.2) 0%, transparent 70%)",
-                mixBlendMode: "screen",
-                filter: animConfig.enableBlur ? "blur(40px)" : "blur(20px)",
-              }}
-            />
-          )}
-
-          <div className="relative z-10 flex flex-col h-full">
-            {/* Logo row */}
-            <div className="flex items-center justify-between h-14 px-4 border-b flex-shrink-0" style={{ borderColor: 'var(--cyber-border)', background: 'var(--cyber-bg-dark)' }}>
-              <div className="sidebar-logo-text overflow-hidden transition-all duration-200">
-                <h1 className="text-lg font-bold" style={{ fontFamily: '"Orbitron", sans-serif', color: 'var(--cyber-cyan)', animation: 'neonFlicker 3s infinite', letterSpacing: '0.1em' }}>AEON DIAL</h1>
-                <p className="text-[10px]" style={{ fontFamily: '"JetBrains Mono", monospace', color: 'var(--cyber-text-muted)' }}>v1.0.0</p>
+      <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "6px 0", scrollbarWidth: "none" }}>
+        {navGroups.map((group, gi) => (
+          <div key={gi} style={{ marginBottom: expanded ? 2 : 6 }}>
+            {group.label && expanded && (
+              <div style={{ fontSize: "0.58rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--cyber-text-muted)", padding: "8px 14px 2px", opacity: 0.55, whiteSpace: "nowrap" }}>
+                {group.label}
               </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                {/* Pin button — desktop hover-mode only */}
-                {sidebarHoverMode && (
-                  <button
-                    className={`sidebar-pin-btn${sidebarPinned ? " active" : ""}`}
-                    onClick={toggleSidebarPin}
-                    title={sidebarPinned ? "Unpin sidebar" : "Pin sidebar open"}
-                    aria-label={sidebarPinned ? "Unpin sidebar" : "Pin sidebar open"}
-                  >
-                    {sidebarPinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
-                  </button>
-                )}
-                {/* Close button — CSS: visible on mobile, hidden on desktop */}
-                <button
-                  className="shell-sidebar-close cyber-btn h-8 w-8 items-center justify-center"
-                  style={{ padding: '4px', minHeight: 'auto', border: '1px solid var(--cyber-border)' }}
-                  aria-label="Close menu"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Nav — overscroll-contain keeps wheel events in the sidebar */}
-            <nav className="px-1 py-2 space-y-0.5 flex-1 overflow-y-auto overscroll-contain" style={{ minHeight: 0 }}>
-              {navigation.map((item) => (
-                <div
-                  key={item.name}
-                  ref={(el) => {
-                    navItemsRef.current[item.name] = el
-                  }}
-                >
-                  <Link
-                    href={item.href}
-                    className="cyber-sidebar-item"
-                    style={{
-                      ...(pathname === item.href || pathname?.startsWith(item.href + "/")
-                        ? {
-                            color: 'var(--cyber-cyan)',
-                            background: 'var(--cyber-surface)',
-                            borderLeftColor: 'var(--cyber-cyan)',
-                            boxShadow: 'inset 0 0 20px rgba(0, 240, 255, 0.03)',
-                          }
-                        : {}),
-                    }}
-                    onClick={() => {
-                      handleNavClick(item.name)
-                      if (item.submenu) {
-                        toggleSubmenu(item.name)
-                      }
-                    }}
-                  >
-                    <div className="relative flex items-center gap-2">
-                      <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="sidebar-label transition-all duration-200">{item.name}</span>
-                    </div>
-                    {item.submenu && (
-                      <ChevronDown
-                        className={`sidebar-chevron w-3 h-3 transition-transform ml-auto ${
-                          expandedMenus.includes(item.name) ? "rotate-180" : ""
-                        }`}
-                      />
-                    )}
-                  </Link>
-
-                  {item.submenu && expandedMenus.includes(item.name) && (
-                    <div className="sidebar-submenu ml-5 mt-0.5 space-y-0.5">
-                      {item.submenu.map((subitem) => (
-                        <Link
-                          key={subitem.href}
-                          href={subitem.href}
-                          className="cyber-sidebar-item"
-                          style={{
-                            fontSize: '0.7rem',
-                            padding: '0.5rem 1rem',
-                            minHeight: '36px',
-                            ...(pathname === subitem.href
-                              ? {
-                                  color: 'var(--cyber-cyan)',
-                                  background: 'var(--cyber-surface)',
-                                  borderLeftColor: 'var(--cyber-cyan)',
-                                }
-                              : {}),
-                          }}
-                          onClick={() => handleNavClick(subitem.name)}
-                        >
-                          {subitem.name}
-                        </Link>
-                      ))}
+            )}
+            {group.label && !expanded && gi > 0 && (
+              <div style={{ height: 1, background: "var(--aeon-border)", margin: "4px 10px" }} />
+            )}
+            {group.items.map((item: any) => {
+              const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
+              const isOpen = expandedMenus.includes(item.name)
+              const hasSub = item.submenu && item.submenu.length > 0
+              const baseStyle: React.CSSProperties = {
+                display: "flex", alignItems: "center", gap: 10,
+                padding: expanded ? "7px 12px" : "0",
+                justifyContent: expanded ? "flex-start" : "center",
+                background: isActive ? "rgba(0,240,255,0.07)" : "none",
+                border: "none",
+                borderLeft: expanded && isActive ? "2px solid var(--cyber-cyan)" : "2px solid transparent",
+                borderRadius: expanded ? "0 6px 6px 0" : 7,
+                color: isActive ? "var(--cyber-cyan)" : "var(--cyber-text-dim)",
+                fontSize: "0.72rem", fontWeight: isActive ? 600 : 400,
+                letterSpacing: "0.04em", textTransform: "uppercase",
+                transition: "all 0.15s", textDecoration: "none", cursor: "pointer",
+                margin: expanded ? "1px 6px 1px 0" : "2px auto",
+                width: expanded ? "calc(100% - 6px)" : 36,
+                minHeight: expanded ? 34 : 36,
+                height: expanded ? "auto" : 36,
+                flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden",
+              }
+              return (
+                <div key={item.name}>
+                  {hasSub ? (
+                    <button onClick={() => expanded && toggleSubmenu(item.name)} title={!expanded ? item.name : undefined}
+                      style={baseStyle as any}
+                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = "var(--cyber-cyan)" }}
+                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.color = "var(--cyber-text-dim)" }}>
+                      <item.icon className="w-4 h-4 flex-shrink-0" />
+                      {expanded && (
+                        <>
+                          <span style={{ flex: 1, textAlign: "left" }}>{item.name}</span>
+                          <ChevronDown className="w-3 h-3 flex-shrink-0" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s", opacity: 0.55 }} />
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <Link href={item.href} title={!expanded ? item.name : undefined}
+                      onClick={() => { vibrate("light"); setMobileOpen(false) }}
+                      style={baseStyle as any}
+                      onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.color = "var(--cyber-cyan)" }}
+                      onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.color = "var(--cyber-text-dim)" }}>
+                      <item.icon className="w-4 h-4 flex-shrink-0" />
+                      {expanded && <span>{item.name}</span>}
+                    </Link>
+                  )}
+                  {hasSub && expanded && isOpen && (
+                    <div style={{ paddingLeft: 34, paddingBottom: 2 }}>
+                      {item.submenu.map((sub: any) => {
+                        const subActive = pathname === sub.href
+                        return (
+                          <Link key={sub.href} href={sub.href}
+                            onClick={() => { vibrate("light"); setMobileOpen(false) }}
+                            style={{ display: "block", padding: "5px 10px", borderRadius: 5, fontSize: "0.68rem", letterSpacing: "0.03em", color: subActive ? "var(--cyber-cyan)" : "var(--cyber-text-muted)", background: subActive ? "rgba(0,240,255,0.06)" : "none", fontWeight: subActive ? 600 : 400, textDecoration: "none", whiteSpace: "nowrap", transition: "color 0.15s" }}
+                            onMouseEnter={e => { if (!subActive) (e.currentTarget as HTMLElement).style.color = "var(--cyber-cyan)" }}
+                            onMouseLeave={e => { if (!subActive) (e.currentTarget as HTMLElement).style.color = "var(--cyber-text-muted)" }}>
+                            {sub.name}
+                          </Link>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
-              ))}
-            </nav>
+              )
+            })}
+          </div>
+        ))}
+      </nav>
 
-            {/* Footer */}
-            <div className="px-3 py-3" style={{ borderTop: '1px solid var(--cyber-border)' }}>
-              <SignedIn>
-                <Link
-                  href="/settings/account"
-                  className="cyber-sidebar-item"
-                  style={{
-                    fontSize: '0.75rem',
-                    ...(pathname?.startsWith("/settings/account")
-                      ? {
-                          color: 'var(--cyber-cyan)',
-                          background: 'var(--cyber-surface)',
-                          borderLeftColor: 'var(--cyber-cyan)',
-                        }
-                      : {}),
-                  }}
-                >
-                  <Settings className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>Account Manager</span>
-                </Link>
-              </SignedIn>
+      <div style={{ borderTop: "1px solid var(--aeon-border)", padding: expanded ? "8px 6px" : "8px 0", display: "flex", justifyContent: expanded ? "flex-start" : "center" }}>
+        <SignedIn>
+          <Link href="/settings/account" title={!expanded ? "Account Manager" : undefined}
+            onClick={() => setMobileOpen(false)}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: expanded ? "6px 10px" : "0", justifyContent: expanded ? "flex-start" : "center", borderRadius: 6, color: pathname?.startsWith("/settings/account") ? "var(--cyber-cyan)" : "var(--cyber-text-muted)", fontSize: "0.68rem", letterSpacing: "0.04em", textTransform: "uppercase", textDecoration: "none", width: expanded ? "100%" : 36, height: 36, whiteSpace: "nowrap", overflow: "hidden", transition: "color 0.15s" }}>
+            <Settings className="w-3.5 h-3.5 flex-shrink-0" />
+            {expanded && <span>Account Manager</span>}
+          </Link>
+        </SignedIn>
+        <SignedOut>
+          <SignInButton>
+            <button style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: "var(--cyber-text-muted)", fontSize: "0.68rem", width: expanded ? "100%" : 36, height: 36 }}>
+              <LogIn className="w-3.5 h-3.5 flex-shrink-0" />
+              {expanded && <span>Sign In</span>}
+            </button>
+          </SignInButton>
+        </SignedOut>
+      </div>
+    </div>
+  )
 
-              <SignedOut>
-                <SignInButton>
-                  <button className="cyber-btn w-full flex items-center gap-2 text-xs">
-                    <LogIn className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>Sign In</span>
-                  </button>
-                </SignInButton>
-              </SignedOut>
-            </div>
+  return (
+    <ScrollProvider>
+      <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#0a0a0a" }}>
+
+        <aside className="hidden md:flex flex-col" style={{
+          width: sidebarW, minWidth: sidebarW, height: "100vh",
+          background: "var(--aeon-bg2)", borderRight: "1px solid var(--aeon-border)",
+          flexShrink: 0, overflow: "hidden", position: "relative", zIndex: 20,
+          transition: "width 0.22s cubic-bezier(0.16,1,0.3,1), min-width 0.22s cubic-bezier(0.16,1,0.3,1)",
+        }}>
+          {animConfig.enableGlow && (
+            <div ref={auroraRef} className="absolute inset-0 pointer-events-none" style={{ opacity: 0.18, background: "radial-gradient(ellipse at 50% 0%, rgba(0,240,255,0.1) 0%, transparent 70%)", zIndex: 0 }} />
+          )}
+          <div style={{ position: "relative", zIndex: 1, height: "100%" }}>
+            <SidebarInner />
           </div>
         </aside>
 
-        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <header className="md:hidden sticky top-0 z-40 h-12 flex items-center justify-between px-4 flex-shrink-0" style={{ background: 'var(--cyber-bg-dark)', borderBottom: '1px solid var(--cyber-border)' }}>
-            <span style={{ fontFamily: '"Orbitron", sans-serif', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--cyber-cyan)', textShadow: '0 0 12px rgba(0, 240, 255, 0.35)' }}>AEON DIAL</span>
+        {mobileOpen && (
+          <div className="md:hidden fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(3px)" }} onClick={() => setMobileOpen(false)} />
+        )}
+        <aside className="md:hidden fixed top-0 left-0 h-full z-50" style={{
+          width: EXPANDED_W, background: "var(--aeon-bg2)", borderRight: "1px solid var(--aeon-border)",
+          transform: mobileOpen ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.25s cubic-bezier(0.16,1,0.3,1)",
+        }}>
+          <SidebarInner />
+        </aside>
+
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+          <header className="md:hidden flex items-center justify-between px-4 flex-shrink-0"
+            style={{ height: 48, background: "var(--cyber-bg-dark)", borderBottom: "1px solid var(--cyber-border)" }}>
+            <button onClick={() => setMobileOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--cyber-text-muted)", display: "flex", alignItems: "center" }}>
+              <ChevronRight className="w-5 h-5" />
+            </button>
+            <span style={{ fontFamily: '"Orbitron", sans-serif', fontSize: "0.8rem", fontWeight: 700, letterSpacing: "0.1em", color: "var(--cyber-cyan)", textShadow: "0 0 12px rgba(0,240,255,0.35)" }}>AEON DIAL</span>
             <div className="flex items-center gap-2 ml-auto">
               <SignedIn>
-                <OrganizationSwitcher
-                  hidePersonal
-                  appearance={{
-                    elements: {
-                      rootBox: "h-7",
-                      organizationSwitcherTrigger:
-                        "h-7 text-xs bg-[#1a1a1a] rounded-md px-2 py-1",
-                      organizationSwitcherTriggerIcon: "text-[#00f0ff]",
-                    },
-                  }}
-                />
-                <UserButton
-                  afterSignOutUrl="/"
-                  appearance={{
-                    elements: {
-                      avatarBox: "h-7 w-7",
-                    },
-                  }}
-                />
+                <OrganizationSwitcher hidePersonal appearance={{ elements: { rootBox: "h-7", organizationSwitcherTrigger: "h-7 text-xs bg-[#1a1a1a] rounded-md px-2 py-1" } }} />
+                <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: "h-7 w-7" } }} />
               </SignedIn>
             </div>
           </header>
 
-          <header className="hidden md:flex h-16 bg-neutral-900 border-b border-neutral-800 items-center justify-between px-4 lg:px-6 flex-shrink-0">
-
-            {/* Brand — CSS: visible on mobile, hidden on desktop */}
-            <span className="shell-brand" style={{ fontFamily: '"Orbitron", sans-serif', color: 'var(--cyber-cyan)', textShadow: '0 0 12px rgba(0, 240, 255, 0.35)' }}>AEON DIAL</span>
-
-            {/* Date — CSS: hidden on mobile, visible on desktop */}
-            <div className="shell-date text-sm" style={{ fontFamily: '"Orbitron", sans-serif', color: 'var(--cyber-cyan)', textTransform: 'uppercase', letterSpacing: '0.05em' }} suppressHydrationWarning>
+          <header className="hidden md:flex items-center justify-between px-4 lg:px-6 flex-shrink-0"
+            style={{ height: 52, background: "var(--aeon-bg2)", borderBottom: "1px solid var(--aeon-border)" }}>
+            <div style={{ fontFamily: '"Orbitron", sans-serif', fontSize: "0.68rem", color: "var(--cyber-cyan)", textTransform: "uppercase", letterSpacing: "0.05em" }} suppressHydrationWarning>
               {mounted ? headerDate : ""}
             </div>
-
             <div className="ml-auto flex items-center gap-4">
-              <SignedIn>
-                <ClerkShellControls />
-              </SignedIn>
-              <div className="cyber-badge cyber-badge-green" style={{ fontSize: '0.65rem' }}>
-                <span>System Online</span>
-              </div>
-              <div
-                className="hidden xl:block text-xs"
-                style={{ fontFamily: '"JetBrains Mono", monospace', color: 'var(--cyber-text-muted)' }}
-                suppressHydrationWarning
-              >
-                GPU: {governor.webGLQuality.toUpperCase()} | FPS: {governor.currentFPS} | Scale:{" "}
-                {(governor.animationScale * 100).toFixed(0)}%
-                {governor.isThrottled ? " (THROTTLED)" : ""}
+              <SignedIn><ClerkShellControls /></SignedIn>
+              <div className="cyber-badge cyber-badge-green" style={{ fontSize: "0.6rem" }}><span>System Online</span></div>
+              <div className="hidden xl:block text-xs" style={{ fontFamily: '"JetBrains Mono", monospace', color: "var(--cyber-text-muted)" }} suppressHydrationWarning>
+                GPU: {governor.webGLQuality.toUpperCase()} | FPS: {governor.currentFPS} | Scale: {(governor.animationScale * 100).toFixed(0)}%{governor.isThrottled ? " (THROTTLED)" : ""}
               </div>
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto bg-neutral-950 pb-20 md:pb-0">
+          <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden", background: "var(--cyber-bg-darkest, #050508)", minWidth: 0 }} className="pb-20 md:pb-0">
             {pageContent}
           </main>
 
-          <div className="md:hidden">
-            <MobileBottomNav />
-          </div>
+          <div className="md:hidden"><MobileBottomNav /></div>
         </div>
 
         <FloatingDialer />
