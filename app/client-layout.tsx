@@ -169,7 +169,6 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
   const [expanded, setExpanded] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const auroraRef = useRef<HTMLDivElement>(null)
-  const navRef = useRef<HTMLElement>(null)
   const capabilities = useDeviceCapabilities()
   const [governor] = usePerformanceGovernor(capabilities)
   const animConfig = getAnimationConfig(governor)
@@ -194,30 +193,6 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
       gsap.to(auroraRef.current, { duration: 2 / governor.animationScale, filter: "hue-rotate(360deg)", repeat: -1, ease: "none" })
     }
   }, [animConfig.enableGlow, governor.animationScale])
-
-  // Native non-passive wheel handler — must be attached via addEventListener
-  // because React synthetic onWheel is always passive on modern browsers,
-  // meaning e.preventDefault() is ignored and Lenis still catches the delta.
-  useEffect(() => {
-    const el = navRef.current
-    if (!el) return
-    const handleWheel = (e: WheelEvent) => {
-      const atTop = el.scrollTop <= 0
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
-      // Always stop the event from reaching Lenis
-      e.stopPropagation()
-      // At boundaries, prevent the browser overscroll too
-      if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
-        e.preventDefault()
-        return
-      }
-      // Manually scroll the nav so we own the scroll entirely
-      el.scrollTop += e.deltaY
-      e.preventDefault()
-    }
-    el.addEventListener("wheel", handleWheel, { passive: false, capture: true })
-    return () => el.removeEventListener("wheel", handleWheel, { capture: true })
-  }, [])
 
   const toggleExpanded = () => {
     const next = !expanded
@@ -256,7 +231,6 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
       </div>
 
       <nav
-        ref={navRef}
         data-lenis-prevent
         style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "6px 0", scrollbarWidth: "thin", scrollbarColor: "rgba(0,240,255,0.15) transparent", minHeight: 0, overscrollBehavior: "contain" }}>
         {navGroups.map((group, gi) => (
