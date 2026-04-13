@@ -195,6 +195,30 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
     }
   }, [animConfig.enableGlow, governor.animationScale])
 
+  // Native non-passive wheel handler — must be attached via addEventListener
+  // because React synthetic onWheel is always passive on modern browsers,
+  // meaning e.preventDefault() is ignored and Lenis still catches the delta.
+  useEffect(() => {
+    const el = navRef.current
+    if (!el) return
+    const handleWheel = (e: WheelEvent) => {
+      const atTop = el.scrollTop <= 0
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
+      // Always stop the event from reaching Lenis
+      e.stopPropagation()
+      // At boundaries, prevent the browser overscroll too
+      if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
+        e.preventDefault()
+        return
+      }
+      // Manually scroll the nav so we own the scroll entirely
+      el.scrollTop += e.deltaY
+      e.preventDefault()
+    }
+    el.addEventListener("wheel", handleWheel, { passive: false, capture: true })
+    return () => el.removeEventListener("wheel", handleWheel, { capture: true })
+  }, [])
+
   const toggleExpanded = () => {
     const next = !expanded
     setExpanded(next)
@@ -234,15 +258,6 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
       <nav
         ref={navRef}
         data-lenis-prevent
-        onWheel={(e) => {
-          const el = e.currentTarget
-          const atTop = el.scrollTop === 0
-          const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
-          if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
-            e.preventDefault()
-          }
-          e.stopPropagation()
-        }}
         style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "6px 0", scrollbarWidth: "thin", scrollbarColor: "rgba(0,240,255,0.15) transparent", minHeight: 0, overscrollBehavior: "contain" }}>
         {navGroups.map((group, gi) => (
           <div key={gi} style={{ marginBottom: expanded ? 2 : 6 }}>
