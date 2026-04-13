@@ -1,118 +1,57 @@
-"use client";
+'use client';
+import { useEffect, useState } from 'react';
+import { apiGet } from '@/lib/backend';
 
-import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { ORG_ID, apiGet } from "@/lib/backend";
-
-type UserRecord = {
-  user_id: string;
-  full_name?: string;
-  email: string;
-  role: "owner" | "admin" | "agent";
-  status: string;
+type AgentStateHistory = {
+  history_id?: string;
+  agent_id?: string | null;
+  from_state?: string | null;
+  to_state?: string | null;
+  reason?: string | null;
+  occurred_at?: string | null;
 };
 
-type CallRecord = {
-  call_id: string;
-  status: string;
-  metadata?: {
-    agent_id?: string;
-    disposition?: string;
-    [key: string]: unknown;
-  };
-};
-
-export default function AgentReportPage() {
-  const [users, setUsers] = useState<UserRecord[]>([]);
-  const [calls, setCalls] = useState<CallRecord[]>([]);
+export default function AgentStateHistoryPage() {
+  const [data, setData] = useState<AgentStateHistory[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-
-    async function load() {
-      try {
-        const [userData, callData] = await Promise.all([
-          apiGet<UserRecord[]>(`/users?org_id=${encodeURIComponent(ORG_ID)}`),
-          apiGet<CallRecord[]>(`/telephony/calls?org_id=${encodeURIComponent(ORG_ID)}&limit=500`),
-        ]);
-
-        if (!mounted) return;
-        setUsers(userData);
-        setCalls(callData);
-      } catch (e) {
-        if (!mounted) return;
-        setError(e instanceof Error ? e.message : "Failed to load agent report");
-      }
-    }
-
-    load();
-    return () => {
-      mounted = false;
-    };
+    apiGet<AgentStateHistory[]>('/api/agent-state-history')
+      .then((d) => { if (mounted) { setData(d); setLoading(false); } })
+      .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
+    return () => { mounted = false; };
   }, []);
 
-  const reportRows = useMemo(() => {
-    const byAgent = new Map<string, { total: number; completed: number; converted: number }>();
 
-    for (const call of calls) {
-      const agentId = call.metadata?.agent_id;
-      if (!agentId) continue;
-
-      if (!byAgent.has(agentId)) {
-        byAgent.set(agentId, { total: 0, completed: 0, converted: 0 });
-      }
-
-      const row = byAgent.get(agentId)!;
-      row.total += 1;
-      if (call.status === "completed") row.completed += 1;
-      if (call.metadata?.disposition === "converted") row.converted += 1;
-    }
-
-    return users
-      .map((user) => {
-        const stats = byAgent.get(user.user_id) || { total: 0, completed: 0, converted: 0 };
-        const completionRate = stats.total ? Math.round((stats.completed / stats.total) * 100) : 0;
-        const conversionRate = stats.completed ? Math.round((stats.converted / stats.completed) * 100) : 0;
-        return {
-          user,
-          ...stats,
-          completionRate,
-          conversionRate,
-        };
-      })
-      .sort((a, b) => b.total - a.total);
-  }, [calls, users]);
+  if (loading) return <div className="p-6 text-neutral-400">Loading…</div>;
+  if (error)   return <div className="p-6 text-red-400">Error: {error}</div>;
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Agent Performance Reports</h1>
-        <p className="text-sm text-neutral-500">Live stats from users and call event metadata.</p>
-      </div>
+    <div className="space-y-4 p-6">
+      <h1 className="text-2xl font-semibold">Agent State History</h1>
 
-      {error ? <Card className="border-red-300 p-4 text-sm text-red-700">{error}</Card> : null}
-
-      <Card className="p-4">
-        <h2 className="mb-3 text-lg font-medium">Agent Leaderboard</h2>
-        <div className="space-y-2">
-          {reportRows.map((row) => (
-            <div key={row.user.user_id} className="flex items-center justify-between rounded-md border p-3 text-sm">
-              <div>
-                <div className="font-medium">{row.user.full_name || row.user.email}</div>
-                <div className="text-neutral-500">{row.user.role}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">Calls: {row.total}</Badge>
-                <Badge variant="outline">Completion: {row.completionRate}%</Badge>
-                <Badge>Conversion: {row.conversionRate}%</Badge>
-              </div>
-            </div>
-          ))}
-          {reportRows.length === 0 ? <div className="text-sm text-neutral-500">No agent data available.</div> : null}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-neutral-800">
+                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">agent id</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">from state</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">to state</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">reason</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">occurred at</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.history_id ?? String(Math.random())} className="border-b border-neutral-800 hover:bg-neutral-900/50">
+                  <td className="px-3 py-2 text-sm">{row.agent_id ?? '—'}</td><td className="px-3 py-2 text-sm">{row.from_state ?? '—'}</td><td className="px-3 py-2 text-sm">{row.to_state ?? '—'}</td><td className="px-3 py-2 text-sm">{row.reason ?? '—'}</td><td className="px-3 py-2 text-sm">{row.occurred_at ? new Date(row.occurred_at).toLocaleString() : '—'}</td>
+                </tr>
+              ))}
+              {data.length === 0 && (
+                <tr><td colSpan={5} className="px-3 py-4 text-sm text-neutral-500 text-center">No records found.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </Card>
+
     </div>
   );
 }

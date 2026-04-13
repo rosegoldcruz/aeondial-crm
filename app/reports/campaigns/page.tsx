@@ -1,119 +1,56 @@
-"use client";
+'use client';
+import { useEffect, useState } from 'react';
+import { apiGet } from '@/lib/backend';
 
-import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Target } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { ORG_ID, apiGet } from "@/lib/backend";
-
-type CampaignRecord = {
-  campaign_id: string;
-  name?: string;
-  status?: string;
+type Campaign = {
+  campaign_id?: string;
+  name?: string | null;
+  status?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
 };
 
-type CallRecord = {
-  call_id: string;
-  campaign_id: string;
-  status: string;
-};
-
-export default function CampaignReportsPage() {
-  const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
-  const [calls, setCalls] = useState<CallRecord[]>([]);
+export default function CampaignPage() {
+  const [data, setData] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-
-    async function load() {
-      try {
-        const [campaignData, callData] = await Promise.all([
-          apiGet<CampaignRecord[]>(`/campaigns?org_id=${encodeURIComponent(ORG_ID)}`),
-          apiGet<CallRecord[]>(`/telephony/calls?org_id=${encodeURIComponent(ORG_ID)}&limit=500`),
-        ]);
-
-        if (!mounted) return;
-        setCampaigns(campaignData);
-        setCalls(callData);
-      } catch (e) {
-        if (!mounted) return;
-        setError(e instanceof Error ? e.message : "Failed to load campaign data");
-      }
-    }
-
-    load();
-    return () => {
-      mounted = false;
-    };
+    apiGet<Campaign[]>('/api/campaigns')
+      .then((d) => { if (mounted) { setData(d); setLoading(false); } })
+      .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
+    return () => { mounted = false; };
   }, []);
 
-  const byCampaign = useMemo(() => {
-    const grouped = new Map<string, { total: number; completed: number }>();
 
-    for (const call of calls) {
-      if (!grouped.has(call.campaign_id)) {
-        grouped.set(call.campaign_id, { total: 0, completed: 0 });
-      }
-      const row = grouped.get(call.campaign_id)!;
-      row.total += 1;
-      if (call.status === "completed") row.completed += 1;
-    }
-
-    return campaigns.map((campaign) => {
-      const metrics = grouped.get(campaign.campaign_id) || { total: 0, completed: 0 };
-      const completionRate = metrics.total > 0 ? Math.round((metrics.completed / metrics.total) * 100) : 0;
-      return {
-        ...campaign,
-        totalCalls: metrics.total,
-        completedCalls: metrics.completed,
-        completionRate,
-      };
-    });
-  }, [calls, campaigns]);
+  if (loading) return <div className="p-6 text-neutral-400">Loading…</div>;
+  if (error)   return <div className="p-6 text-red-400">Error: {error}</div>;
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Campaign Reports</h1>
-        <p className="text-sm text-neutral-500">Real campaign outcomes derived from telephony activity.</p>
-      </div>
+    <div className="space-y-4 p-6">
+      <h1 className="text-2xl font-semibold">Campaign Reports</h1>
 
-      {error ? <Card className="border-red-300 p-4 text-sm text-red-700">{error}</Card> : null}
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="p-4">
-          <div className="flex items-center gap-2 text-sm text-neutral-500"><Target className="h-4 w-4" /> Campaigns</div>
-          <div className="mt-2 text-2xl font-semibold">{campaigns.length}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2 text-sm text-neutral-500"><BarChart3 className="h-4 w-4" /> Calls Tracked</div>
-          <div className="mt-2 text-2xl font-semibold">{calls.length}</div>
-        </Card>
-      </div>
-
-      <Card className="p-4">
-        <h2 className="mb-3 text-lg font-medium">Per-Campaign Performance</h2>
-        <div className="space-y-2">
-          {byCampaign.map((campaign) => (
-            <div
-              key={campaign.campaign_id}
-              className="flex items-center justify-between rounded-md border p-3 text-sm"
-            >
-              <div>
-                <div className="font-medium">{campaign.name || campaign.campaign_id}</div>
-                <div className="text-neutral-500">ID: {campaign.campaign_id}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">Calls: {campaign.totalCalls}</Badge>
-                <Badge variant="outline">Completed: {campaign.completedCalls}</Badge>
-                <Badge>{campaign.completionRate}%</Badge>
-              </div>
-            </div>
-          ))}
-          {campaigns.length === 0 ? <div className="text-sm text-neutral-500">No campaigns found.</div> : null}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-neutral-800">
+                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">name</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">status</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">starts at</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">ends at</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.campaign_id ?? String(Math.random())} className="border-b border-neutral-800 hover:bg-neutral-900/50">
+                  <td className="px-3 py-2 text-sm">{row.name ?? '—'}</td><td className="px-3 py-2 text-sm">{row.status ?? '—'}</td><td className="px-3 py-2 text-sm">{row.starts_at ? new Date(row.starts_at).toLocaleString() : '—'}</td><td className="px-3 py-2 text-sm">{row.ends_at ? new Date(row.ends_at).toLocaleString() : '—'}</td>
+                </tr>
+              ))}
+              {data.length === 0 && (
+                <tr><td colSpan={4} className="px-3 py-4 text-sm text-neutral-500 text-center">No records found.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </Card>
+
     </div>
   );
 }

@@ -1,62 +1,57 @@
-import { Upload, Plus, Download } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
+'use client';
+import { useEffect, useState } from 'react';
+import { apiGet } from '@/lib/backend';
 
-export default function ListsPage() {
+type LeadList = {
+  list_id?: string;
+  name?: string | null;
+  source_type?: string | null;
+  total_rows?: number | null;
+  imported_rows?: number | null;
+  status?: string | null;
+};
+
+export default function LeadListPage() {
+  const [data, setData] = useState<LeadList[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    apiGet<LeadList[]>('/api/lead-lists')
+      .then((d) => { if (mounted) { setData(d); setLoading(false); } })
+      .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
+    return () => { mounted = false; };
+  }, []);
+
+
+  if (loading) return <div className="p-6 text-neutral-400">Loading…</div>;
+  if (error)   return <div className="p-6 text-red-400">Error: {error}</div>;
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-orange-500">Lead Lists</h1>
-          <p className="text-neutral-400 text-sm">Manage contact lists and leads</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/lists/upload">
-            <Button variant="outline" className="border-neutral-800 bg-transparent">
-              <Upload className="w-4 h-4 mr-2" />
-              Upload CSV
-            </Button>
-          </Link>
-          <Link href="/lists/new">
-            <Button className="bg-orange-500 hover:bg-orange-600">
-              <Plus className="w-4 h-4 mr-2" />
-              New List
-            </Button>
-          </Link>
-        </div>
-      </div>
+    <div className="space-y-4 p-6">
+      <h1 className="text-2xl font-semibold">Lead Lists</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[
-          { name: "Summer Leads 2025", count: 15420, status: "Active" },
-          { name: "Q1 Follow-ups", count: 8932, status: "Active" },
-          { name: "Customer Survey List", count: 5234, status: "Inactive" },
-        ].map((list, i) => (
-          <div key={i} className="p-6 bg-neutral-900 border border-neutral-800 rounded-lg">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-white font-medium mb-1">{list.name}</h3>
-                <p className="text-sm text-neutral-400">{list.count.toLocaleString()} leads</p>
-              </div>
-              <span
-                className={`px-2 py-1 text-xs rounded ${
-                  list.status === "Active" ? "bg-green-500/20 text-green-500" : "bg-neutral-700 text-neutral-400"
-                }`}
-              >
-                {list.status}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="flex-1 border-neutral-700 text-xs bg-transparent">
-                View
-              </Button>
-              <Button size="sm" variant="outline" className="border-neutral-700 bg-transparent">
-                <Download className="w-3 h-3" />
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-neutral-800">
+                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">name</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">source type</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">total rows</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">imported rows</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.list_id ?? String(Math.random())} className="border-b border-neutral-800 hover:bg-neutral-900/50">
+                  <td className="px-3 py-2 text-sm">{row.name ?? '—'}</td><td className="px-3 py-2 text-sm">{row.source_type ?? '—'}</td><td className="px-3 py-2 text-sm">{row.total_rows ?? '—'}</td><td className="px-3 py-2 text-sm">{row.imported_rows ?? '—'}</td><td className="px-3 py-2 text-sm">{row.status ?? '—'}</td>
+                </tr>
+              ))}
+              {data.length === 0 && (
+                <tr><td colSpan={5} className="px-3 py-4 text-sm text-neutral-500 text-center">No records found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
     </div>
-  )
+  );
 }

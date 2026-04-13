@@ -1,90 +1,57 @@
-"use client";
+'use client';
+import { useEffect, useState } from 'react';
+import { apiGet } from '@/lib/backend';
 
-import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { ORG_ID, apiGet } from "@/lib/backend";
-
-type UserRecord = {
-  user_id: string;
-  full_name?: string;
-  email: string;
-  role: string;
-  status: string;
+type AgentSession = {
+  session_id?: string;
+  agent_id?: string | null;
+  state?: string | null;
+  campaign_id?: string | null;
+  started_at?: string | null;
+  registration_verified?: boolean | null;
 };
 
-type CallRecord = {
-  status: string;
-  metadata?: { agent_id?: string; [key: string]: unknown };
-};
-
-export default function AgentStatusPage() {
-  const [users, setUsers] = useState<UserRecord[]>([]);
-  const [calls, setCalls] = useState<CallRecord[]>([]);
+export default function AgentSessionPage() {
+  const [data, setData] = useState<AgentSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([
-      apiGet<UserRecord[]>(`/users?org_id=${encodeURIComponent(ORG_ID)}`),
-      apiGet<CallRecord[]>(`/telephony/calls?org_id=${encodeURIComponent(ORG_ID)}&limit=500`),
-    ])
-      .then(([userData, callData]) => {
-        if (!mounted) return;
-        setUsers(userData);
-        setCalls(callData);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setUsers([]);
-        setCalls([]);
-      });
-
-    return () => {
-      mounted = false;
-    };
+    apiGet<AgentSession[]>('/api/agent-sessions')
+      .then((d) => { if (mounted) { setData(d); setLoading(false); } })
+      .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
+    return () => { mounted = false; };
   }, []);
 
-  const rows = useMemo(() => {
-    const byAgent = new Map<string, { total: number; active: number }>();
-    for (const call of calls) {
-      const id = call.metadata?.agent_id;
-      if (!id) continue;
-      if (!byAgent.has(id)) byAgent.set(id, { total: 0, active: 0 });
-      const current = byAgent.get(id)!;
-      current.total += 1;
-      if (call.status === "originated" || call.status === "bridged" || call.status === "transferred") {
-        current.active += 1;
-      }
-    }
 
-    return users.map((user) => ({
-      ...user,
-      totalCalls: byAgent.get(user.user_id)?.total || 0,
-      activeCalls: byAgent.get(user.user_id)?.active || 0,
-    }));
-  }, [users, calls]);
+  if (loading) return <div className="p-6 text-neutral-400">Loading…</div>;
+  if (error)   return <div className="p-6 text-red-400">Error: {error}</div>;
 
   return (
-    <div className="space-y-6 p-6">
-      <h1 className="text-2xl font-semibold">Agent Status Board</h1>
-      <Card className="p-4">
-        <div className="space-y-2">
-          {rows.map((row) => (
-            <div key={row.user_id} className="flex items-center justify-between rounded-md border p-3 text-sm">
-              <div>
-                <div className="font-medium">{row.full_name || row.email}</div>
-                <div className="text-neutral-500">{row.role}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">{row.status}</Badge>
-                <Badge variant="outline">Calls: {row.totalCalls}</Badge>
-                <Badge>Active: {row.activeCalls}</Badge>
-              </div>
-            </div>
-          ))}
-          {rows.length === 0 ? <div className="text-sm text-neutral-500">No agent status rows found.</div> : null}
+    <div className="space-y-4 p-6">
+      <h1 className="text-2xl font-semibold">Agent Status</h1>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-neutral-800">
+                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">agent id</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">state</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">campaign id</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">started at</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">registration verified</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.session_id ?? String(Math.random())} className="border-b border-neutral-800 hover:bg-neutral-900/50">
+                  <td className="px-3 py-2 text-sm">{row.agent_id ?? '—'}</td><td className="px-3 py-2 text-sm">{row.state ?? '—'}</td><td className="px-3 py-2 text-sm">{row.campaign_id ?? '—'}</td><td className="px-3 py-2 text-sm">{row.started_at ? new Date(row.started_at).toLocaleString() : '—'}</td><td className="px-3 py-2 text-sm">{row.registration_verified === true ? '✓' : row.registration_verified === false ? '✗' : '—'}</td>
+                </tr>
+              ))}
+              {data.length === 0 && (
+                <tr><td colSpan={5} className="px-3 py-4 text-sm text-neutral-500 text-center">No records found.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </Card>
+
     </div>
   );
 }

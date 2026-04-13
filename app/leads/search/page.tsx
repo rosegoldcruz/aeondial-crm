@@ -1,89 +1,75 @@
-"use client";
+'use client';
+import { useEffect, useState } from 'react';
+import { ORG_ID, apiGet } from '@/lib/backend';
 
-import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { ORG_ID, apiGet } from "@/lib/backend";
-
-type LeadRecord = {
-  lead_id: string;
-  status: string;
-  source?: string;
-  metadata?: {
-    first_name?: string;
-    last_name?: string;
-    email?: string;
-    phone?: string;
-    company?: string;
-    [key: string]: unknown;
-  };
+type Lead = {
+  lead_id?: string;
+  contact_id?: string | null;
+  status?: string | null;
+  source?: string | null;
+  assigned_agent?: string | null;
+  attempt_count?: number;
+  do_not_call?: boolean;
+  metadata?: Record<string, unknown> | null;
 };
 
-export default function LeadsSearchPage() {
-  const [leads, setLeads] = useState<LeadRecord[]>([]);
-  const [query, setQuery] = useState("");
-
+export default function LeadPage() {
+  const [data, setData] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+    const [query, setQuery] = useState('');
   useEffect(() => {
     let mounted = true;
-    apiGet<LeadRecord[]>(`/leads?org_id=${encodeURIComponent(ORG_ID)}&limit=500`)
-      .then((data) => {
-        if (!mounted) return;
-        setLeads(data);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setLeads([]);
-      });
-
-    return () => {
-      mounted = false;
-    };
+    apiGet<Lead[]>(`/api/leads?org_id=${encodeURIComponent(ORG_ID)}`)
+      .then((d) => { if (mounted) { setData(d); setLoading(false); } })
+      .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
+    return () => { mounted = false; };
   }, []);
 
-  const filtered = useMemo(() => {
+  const filtered = data.filter((row) => {
     const q = query.toLowerCase();
-    return leads.filter((lead) => {
-      const name = `${lead.metadata?.first_name || ""} ${lead.metadata?.last_name || ""}`.toLowerCase();
-      const email = (lead.metadata?.email || "").toLowerCase();
-      const phone = (lead.metadata?.phone || "").toLowerCase();
-      const company = (lead.metadata?.company || "").toLowerCase();
-      return name.includes(q) || email.includes(q) || phone.includes(q) || company.includes(q);
-    });
-  }, [leads, query]);
+    if (!q) return true;
+    const meta = (row as any).metadata ?? {};
+    return (
+      (meta.lead_name ?? '').toLowerCase().includes(q) ||
+      (meta.phone ?? '').toLowerCase().includes(q) ||
+      (meta.email ?? '').toLowerCase().includes(q) ||
+      ((row as any).contact_id ?? '').toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) return <div className="p-6 text-neutral-400">Loading…</div>;
+  if (error)   return <div className="p-6 text-red-400">Error: {error}</div>;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 p-6">
       <h1 className="text-2xl font-semibold">Lead Search</h1>
-      <Card className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
-          <Input className="pl-9" placeholder="Search leads" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input
+        className="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white w-full max-w-md"
+        placeholder="Search by name, phone, or email…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-neutral-800">
+                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">contact id</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">status</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">source</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">assigned agent</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">attempt count</th><th className="px-3 py-2 text-left text-xs font-medium text-neutral-400 uppercase">do not call</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((row) => (
+                <tr key={row.lead_id ?? String(Math.random())} className="border-b border-neutral-800 hover:bg-neutral-900/50">
+                  <td className="px-3 py-2 text-sm">{row.contact_id ?? '—'}</td><td className="px-3 py-2 text-sm">{row.status ?? '—'}</td><td className="px-3 py-2 text-sm">{row.source ?? '—'}</td><td className="px-3 py-2 text-sm">{row.assigned_agent ?? '—'}</td><td className="px-3 py-2 text-sm">{row.attempt_count ?? '—'}</td><td className="px-3 py-2 text-sm">{row.do_not_call === true ? '✓' : row.do_not_call === false ? '✗' : '—'}</td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={6} className="px-3 py-4 text-sm text-neutral-500 text-center">No records found.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </Card>
 
-      <Card className="p-4">
-        <div className="space-y-2">
-          {filtered.map((lead) => (
-            <div key={lead.lead_id} className="flex items-center justify-between rounded-md border p-3 text-sm">
-              <div>
-                <div className="font-medium">
-                  {lead.metadata?.first_name || "Unknown"} {lead.metadata?.last_name || "Lead"}
-                </div>
-                <div className="text-neutral-500">
-                  {(lead.metadata?.company as string) || "No company"} • {lead.metadata?.email || "No email"}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">{lead.source || "unknown"}</Badge>
-                <Badge>{lead.status}</Badge>
-              </div>
-            </div>
-          ))}
-          {filtered.length === 0 ? <div className="text-sm text-neutral-500">No matching leads.</div> : null}
-        </div>
-      </Card>
     </div>
   );
 }

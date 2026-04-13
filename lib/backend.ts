@@ -63,3 +63,37 @@ export async function apiPost<T>(
 
   return (await res.json()) as T;
 }
+
+export async function apiPatch<T>(
+  path: string,
+  body: Record<string, unknown>,
+  orgId = ORG_ID,
+): Promise<T> {
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    method: 'PATCH',
+    headers: getApiHeaders(orgId),
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || `Request failed: ${res.status}`);
+  }
+
+  return (await res.json()) as T;
+}
+
+export async function apiDelete(
+  path: string,
+  orgId = ORG_ID,
+): Promise<void> {
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    method: 'DELETE',
+    headers: getApiHeaders(orgId),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || `Request failed: ${res.status}`);
+  }
+}
