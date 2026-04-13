@@ -70,6 +70,28 @@ export function ScrollProvider({ children }: { children: React.ReactNode }) {
           wheelMultiplier: 1,
           touchMultiplier: 2,
           infinite: false,
+          allowNestedScroll: true,
+          prevent: (node: Element) => {
+            if (node.closest("[data-lenis-prevent], .shell-sidebar nav, .shell-sidebar [data-lenis-prevent]")) {
+              return true
+            }
+
+            let current: HTMLElement | null = node instanceof HTMLElement ? node : node.parentElement
+            while (current && current !== document.body) {
+              const style = window.getComputedStyle(current)
+              const canScrollY =
+                (style.overflowY === "auto" || style.overflowY === "scroll") &&
+                current.scrollHeight > current.clientHeight
+
+              if (canScrollY) {
+                return true
+              }
+
+              current = current.parentElement
+            }
+
+            return false
+          },
         })
 
         lenisRef.current = lenis
