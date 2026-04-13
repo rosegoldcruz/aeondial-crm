@@ -169,6 +169,7 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
   const [expanded, setExpanded] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const auroraRef = useRef<HTMLDivElement>(null)
+  const navRef = useRef<HTMLElement>(null)
   const capabilities = useDeviceCapabilities()
   const [governor] = usePerformanceGovernor(capabilities)
   const animConfig = getAnimationConfig(governor)
@@ -230,7 +231,19 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
         </button>
       </div>
 
-      <nav data-lenis-prevent style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "6px 0", scrollbarWidth: "thin", scrollbarColor: "rgba(0,240,255,0.15) transparent", minHeight: 0 }}>
+      <nav
+        ref={navRef}
+        data-lenis-prevent
+        onWheel={(e) => {
+          const el = e.currentTarget
+          const atTop = el.scrollTop === 0
+          const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
+          if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
+            e.preventDefault()
+          }
+          e.stopPropagation()
+        }}
+        style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "6px 0", scrollbarWidth: "thin", scrollbarColor: "rgba(0,240,255,0.15) transparent", minHeight: 0, overscrollBehavior: "contain" }}>
         {navGroups.map((group, gi) => (
           <div key={gi} style={{ marginBottom: expanded ? 2 : 6 }}>
             {group.label && expanded && (
