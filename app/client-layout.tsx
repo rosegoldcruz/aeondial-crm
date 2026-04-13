@@ -230,7 +230,7 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
         </button>
       </div>
 
-      <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "6px 0", scrollbarWidth: "none" }}>
+      <nav data-lenis-prevent style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "6px 0", scrollbarWidth: "thin", scrollbarColor: "rgba(0,240,255,0.15) transparent", minHeight: 0 }}>
         {navGroups.map((group, gi) => (
           <div key={gi} style={{ marginBottom: expanded ? 2 : 6 }}>
             {group.label && expanded && (
@@ -339,13 +339,13 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
         <aside className="hidden md:flex flex-col" style={{
           width: sidebarW, minWidth: sidebarW, height: "100vh",
           background: "var(--aeon-bg2)", borderRight: "1px solid var(--aeon-border)",
-          flexShrink: 0, overflow: "hidden", position: "relative", zIndex: 20,
+          flexShrink: 0, overflow: "visible", position: "relative", zIndex: 20,
           transition: "width 0.22s cubic-bezier(0.16,1,0.3,1), min-width 0.22s cubic-bezier(0.16,1,0.3,1)",
         }}>
           {animConfig.enableGlow && (
             <div ref={auroraRef} className="absolute inset-0 pointer-events-none" style={{ opacity: 0.18, background: "radial-gradient(ellipse at 50% 0%, rgba(0,240,255,0.1) 0%, transparent 70%)", zIndex: 0 }} />
           )}
-          <div style={{ position: "relative", zIndex: 1, height: "100%" }}>
+          <div style={{ position: "relative", zIndex: 1, height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <SidebarInner />
           </div>
         </aside>
@@ -361,7 +361,7 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
           <SidebarInner />
         </aside>
 
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", minHeight: 0 }}>
           <header className="md:hidden flex items-center justify-between px-4 flex-shrink-0"
             style={{ height: 48, background: "var(--cyber-bg-dark)", borderBottom: "1px solid var(--cyber-border)" }}>
             <button onClick={() => setMobileOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--cyber-text-muted)", display: "flex", alignItems: "center" }}>
@@ -390,7 +390,7 @@ export default function ClientLayout({ children: pageContent }: React.PropsWithC
             </div>
           </header>
 
-          <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden", background: "var(--cyber-bg-darkest, #050508)", minWidth: 0 }} className="pb-20 md:pb-0">
+          <main data-lenis-prevent style={{ flex: 1, overflowY: "auto", overflowX: "hidden", background: "var(--cyber-bg-darkest, #050508)", minWidth: 0, minHeight: 0 }} className="pb-20 md:pb-0">
             {pageContent}
           </main>
 
